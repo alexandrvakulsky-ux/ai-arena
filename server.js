@@ -114,53 +114,51 @@ app.post('/api/synthesize', requireAuth, async (req, res) => {
   const { question, responses } = req.body;
   if (!question || !responses) return res.status(400).json({ error: 'question and responses required' });
 
-  const prompt = `You are a senior technical editor. A user asked:
+  const prompt = `You are a fact-checker. A user asked:
 
 "${question}"
 
-The three models responded as follows:
+The three models responded:
 
 --- CLAUDE ---
-${responses.claude || '[No response — treat as failed]'}
+${responses.claude || '[No response]'}
 
 --- CHATGPT ---
-${responses.openai || '[No response — treat as failed]'}
+${responses.openai || '[No response]'}
 
 --- GEMINI ---
-${responses.gemini || '[No response — treat as failed]'}
+${responses.gemini || '[No response]'}
 
-Produce exactly TWO sections using the headers below. Do not add any other top-level headers.
-
----
+Output exactly TWO top-level sections with the exact headers below. No other ## sections.
 
 ## 📊 Analysis
 
-Evaluate each model. Use exactly this block format — no text before the first ###, no deviations:
+No text before the first ###. For each model, write up to 3 bullet lines (- ) stating only what the response covers correctly, what it omits, or what it gets wrong relative to the user's question. If bullets don't fit, use at most 2 short sentences. Every line must be verifiable against the response text — no filler, no inference beyond what is written.
+
+Banned without exception: I, we, my, personally, I think, I believe, great, excellent, good, nice, impressive, solid, well, disappointing, unfortunately, surprisingly, clearly, obviously, notably, interestingly, effectively, helpfully, admirably, correctly (as filler), comprehensively (as filler). Third person only. No sentiment.
+
+If a model had no response: write exactly "No response." and Score: 0/10.
+
+Scoring is factual completeness and accuracy against the question only — not writing style or length.
+9–10 = accurate and complete; 7–8 = mostly right, minor omissions; 5–6 = partial or mixed accuracy; 3–4 = thin or off-target; 1–2 = wrong or irrelevant; 0 = no response.
 
 ### Claude
-2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
 
 ### ChatGPT
-2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
 
 ### Gemini
-2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
-
-Scoring guide: 9–10 = essentially complete and accurate; 7–8 = solid with minor gaps; 5–6 = partially useful; 3–4 = superficial or off-target; 1–2 = mostly wrong or irrelevant; 0 = no response.
-
----
 
 ## ✨ Synthesized Answer
 
-Write the single best answer to the user's question. Rules:
-- No meta-commentary about the models or this process — write as if you are the expert answering directly.
-- Do not repeat the analysis above.
-- Structure with a short intro sentence, then use ## / ### headings and bullet points where they add clarity.
-- If the question involves comparing options, metrics, or tradeoffs, include a concise markdown table.
-- Tone: expert, direct, no filler. Every sentence must earn its place.`;
+Answer the user's question directly as the expert. Rules:
+- Never mention models, analysis, or this pipeline.
+- Do not restate or summarize the Analysis above.
+- One short intro sentence, then structure with ## / ### and bullets only where they add clarity.
+- If the question involves options, metrics, or tradeoffs, include one concise markdown table.
+- Every sentence must carry factual payload. No hedging chains, no motivational language, no filler.`;
 
   try {
     const synthesis = await callClaude(prompt, 1800);
