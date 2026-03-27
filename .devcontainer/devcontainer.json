@@ -1,0 +1,19 @@
+{
+  "name": "AI Arena",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "AI Arena",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "npm install && ([ -f .env ] || cp .env.example .env)",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}

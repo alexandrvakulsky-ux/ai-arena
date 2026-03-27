@@ -31,6 +31,18 @@ Open http://localhost:3000 in your browser.
 
 ---
 
+## Develop in the cloud (GitHub Codespaces)
+
+You can work entirely in GitHub without a local clone:
+
+1. Open the repo on GitHub → **Code** → **Codespaces** → **Create codespace on main** (or your branch).
+2. Wait for the container to build; it runs `npm install` and creates `.env` from `.env.example` if missing.
+3. In the codespace terminal: fill in `.env` with your API keys (or use [Codespaces secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-secrets-for-your-codespaces)).
+4. Run: `npm start`
+5. When port **3000** is forwarded, open the forwarded URL from the **Ports** tab.
+
+---
+
 ## Deploying to the web
 
 ### Option A — Railway (easiest, free tier)
