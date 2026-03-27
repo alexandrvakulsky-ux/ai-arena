@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
@@ -30,7 +33,7 @@
     --radius-lg: 16px;
     --radius-md: 10px;
     --radius-sm: 7px;
-    --font: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    --font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --mono: "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
   }
 
@@ -369,40 +372,42 @@
 
   /* MAIN */
   .main {
-    padding: 18px 4px 40px;
+    padding: 24px 4px 48px;
     width: 100%;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
   }
 
   header {
-    margin-bottom: 6px;
+    margin-bottom: 2px;
   }
 
   .logo {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     color: var(--dimmer);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
 
   h1 {
-    font-size: 20px;
-    font-weight: 600;
+    font-size: 26px;
+    font-weight: 700;
     color: var(--text);
-    letter-spacing: 0.02em;
+    letter-spacing: -0.02em;
     display: inline-flex;
     align-items: baseline;
     gap: 8px;
+    line-height: 1.1;
   }
 
   .subtitle {
     font-size: 13px;
     color: var(--dim);
-    margin-top: 4px;
+    margin-top: 6px;
+    letter-spacing: 0.01em;
   }
 
   .panel {
@@ -645,7 +650,7 @@
     background: radial-gradient(circle at top, rgba(24, 24, 37, 0.98), rgba(2, 6, 23, 0.98));
     border: 1px solid rgba(55, 65, 81, 0.9);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 24px;
     opacity: 0;
     transform: translateY(6px);
     transition: opacity 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -683,6 +688,74 @@
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(30, 41, 59, 0.9);
   }
+
+  /* ANALYSIS SCORE CARDS */
+  .analysis-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .analysis-card {
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .ac-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .ac-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    flex: 1;
+  }
+
+  .ac-score {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .ac-score em {
+    font-size: 11px;
+    font-weight: 400;
+    font-style: normal;
+    color: var(--dim);
+    letter-spacing: 0;
+  }
+
+  .ac-bar {
+    height: 2px;
+    background: rgba(51, 65, 85, 0.4);
+    border-radius: 999px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .ac-fill {
+    height: 100%;
+    border-radius: 999px;
+    opacity: 0.75;
+  }
+
+  .ac-text {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .ac-text p { margin: 0; }
+  .ac-text p + p { margin-top: 0.4em; }
 
   .jsb {
     font-family: var(--font);
@@ -1144,6 +1217,40 @@ function showDots(m) {
     '<span class="typing-dots"><span></span><span></span><span></span></span>';
 }
 
+// ── ANALYSIS CARD RENDERER ──
+function renderAnalysisCards(body) {
+  const wrap = document.createElement('div');
+  wrap.className = 'analysis-cards';
+  const modelMeta = {
+    'claude':  { color: 'var(--claude)',  label: 'Claude'  },
+    'chatgpt': { color: 'var(--openai)', label: 'ChatGPT' },
+    'gemini':  { color: 'var(--gemini)', label: 'Gemini'  },
+  };
+  const blocks = body.split(/^###\s+/m).filter(s => s.trim());
+  blocks.forEach(block => {
+    const lines = block.split('\n');
+    const header = lines[0].trim();
+    const key = header.toLowerCase().replace(/\s+/g, '');
+    const meta = modelMeta[key] || { color: 'var(--muted)', label: header };
+    const scoreMatch = block.match(/Score:\s*(\d+)\/10/i);
+    const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
+    const text = lines.slice(1).join('\n').replace(/Score:\s*\d+\/10/gi, '').trim();
+    const card = document.createElement('div');
+    card.className = 'analysis-card';
+    card.innerHTML =
+      `<div class="ac-header">` +
+        `<div class="model-dot" style="background:${meta.color}"></div>` +
+        `<span class="ac-name">${meta.label}</span>` +
+        (score !== null ? `<span class="ac-score" style="color:${meta.color}">${score}<em>/10</em></span>` : '') +
+      `</div>` +
+      (score !== null ? `<div class="ac-bar"><div class="ac-fill" style="width:${score * 10}%;background:${meta.color}"></div></div>` : '') +
+      `<div class="ac-text">${marked.parse(text)}</div>`;
+    wrap.appendChild(card);
+  });
+  if (!wrap.children.length) wrap.innerHTML = marked.parse(body);
+  return wrap;
+}
+
 // ── VERDICT RENDERER ──
 function renderVerdictInto(text, container) {
   container.innerHTML = '';
@@ -1159,6 +1266,7 @@ function renderVerdictInto(text, container) {
   const displayTitle = { '📊 Analysis': 'Analysis', '🔀 Comparison': 'Comparison', '✨ Synthesized Answer': 'Synthesized Answer' };
 
   sections.forEach(({ title, body }, idx) => {
+    const isAnalysis = title.includes('Analysis');
     const isSyn = title.includes('Synthesized');
     const wrap = document.createElement('div');
     wrap.className = 'judge-section';
@@ -1168,7 +1276,9 @@ function renderVerdictInto(text, container) {
     t.textContent = displayTitle[title] || title;
     wrap.appendChild(t);
 
-    if (isSyn) {
+    if (isAnalysis) {
+      wrap.appendChild(renderAnalysisCards(body));
+    } else if (isSyn) {
       const box = document.createElement('div');
       box.className = 'synthesis-box';
       const b = document.createElement('div');

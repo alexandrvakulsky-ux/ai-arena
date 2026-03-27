@@ -132,7 +132,19 @@ ${responses.gemini || '[No response]'}
 Your task has THREE parts. Use these exact section headers:
 
 ## 📊 Analysis
-For each model that responded, write 2-3 sentences covering: what it got right, what it missed, and its overall approach. Score each /10.
+For each model that responded, evaluate it using exactly this format (keep the ### headers exactly as shown, no extra text before the first ###):
+
+### Claude
+[2-3 sentences: what it got right, what it missed, overall approach]
+Score: X/10
+
+### ChatGPT
+[2-3 sentences: what it got right, what it missed, overall approach]
+Score: X/10
+
+### Gemini
+[2-3 sentences: what it got right, what it missed, overall approach]
+Score: X/10
 
 ## 🔀 Comparison
 In 3-5 sentences, highlight key differences — where they agree, where they diverge, and what unique insight each brought.
