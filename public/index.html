@@ -168,7 +168,7 @@
   .sf-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
 
   /* MAIN */
-  .main { padding: 40px 32px 80px; max-width: 900px; }
+  .main { padding: 40px 40px 80px; width: 100%; min-width: 0; }
 
   header { margin-bottom: 32px; }
 
@@ -225,19 +225,19 @@
   .model-status { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
 
   .model-response {
-    font-family: 'Syne', sans-serif; font-size: 0.82rem;
-    line-height: 1.7; color: #c8c8e0;
-    word-break: break-word; min-height: 50px; max-height: 280px; overflow-y: auto;
+    font-family: 'Syne', sans-serif; font-size: 0.84rem;
+    line-height: 1.75; color: #c8c8e0;
+    word-break: break-word; min-height: 50px; max-height: 400px; overflow-y: auto;
   }
-  .model-response p { margin: 0 0 0.7em; }
+  .model-response p { margin: 0 0 0.65em; }
   .model-response p:last-child { margin-bottom: 0; }
-  .model-response h1,.model-response h2,.model-response h3 { font-size: 0.88rem; font-weight: 700; color: var(--text); margin: 0.8em 0 0.3em; }
+  .model-response h1,.model-response h2,.model-response h3 { font-size: 0.84rem; font-weight: 600; color: var(--muted); margin: 0.7em 0 0.2em; text-transform: uppercase; letter-spacing: 0.5px; }
   .model-response ul,.model-response ol { padding-left: 1.4em; margin: 0.4em 0; }
-  .model-response li { margin-bottom: 0.2em; }
+  .model-response li { margin-bottom: 0.3em; }
   .model-response code { font-family: 'DM Mono', monospace; font-size: 0.78rem; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; }
   .model-response pre { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
   .model-response pre code { background: none; padding: 0; }
-  .model-response strong { color: var(--text); font-weight: 600; }
+  .model-response strong { color: #d8d8f0; font-weight: 600; }
 
   .model-response::-webkit-scrollbar { width: 3px; }
   .model-response::-webkit-scrollbar-thumb { background: var(--border); }
@@ -276,7 +276,12 @@
   .jst.comparison { color: var(--gemini); }
   .jst.synthesis { color: var(--judge); }
 
-  .jsb { font-family: 'DM Mono', monospace; font-size: 0.81rem; line-height: 1.8; color: #d8d8ec; white-space: pre-wrap; }
+  .jsb { font-family: 'Syne', sans-serif; font-size: 0.84rem; line-height: 1.8; color: #d8d8ec; }
+  .jsb p { margin: 0 0 0.65em; }
+  .jsb p:last-child { margin-bottom: 0; }
+  .jsb strong { color: #eeeeff; font-weight: 600; }
+  .jsb ul,.jsb ol { padding-left: 1.4em; margin: 0.4em 0; }
+  .jsb li { margin-bottom: 0.3em; }
 
   .synthesis-box {
     background: linear-gradient(135deg, rgba(251,191,36,0.05), rgba(192,132,252,0.05));
