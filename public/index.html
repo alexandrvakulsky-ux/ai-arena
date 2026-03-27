@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Arena</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #16161f;
+    --border: #1e1e2e;
+    --text: #e8e8f0;
+    --muted: #5a5a7a;
+    --claude: #c084fc;
+    --openai: #34d399;
+    --gemini: #60a5fa;
+    --judge: #fbbf24;
+    --danger: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(192,132,252,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(192,132,252,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* PASSWORD GATE */
+  #passwordGate {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+  }
+
+  .gate-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 48px 40px;
+    width: 100%; max-width: 420px; text-align: center; z-index: 1;
+  }
+
+  .gate-icon { font-size: 2.5rem; margin-bottom: 16px; }
+
+  .gate-title {
+    font-size: 1.7rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--claude), var(--gemini));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 6px;
+  }
+
+  .gate-sub { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--muted); margin-bottom: 28px; }
+
+  .gate-input-wrap { position: relative; margin-bottom: 6px; }
+
+  .gate-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 44px 14px 16px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 0.95rem; outline: none;
+    transition: border-color 0.2s; text-align: center; letter-spacing: 3px;
+  }
+
+  .gate-input:focus { border-color: var(--claude); }
+  .gate-input.shake { animation: shake 0.3s; border-color: var(--danger); }
+
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)}
+  }
+
+  .gate-eye {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem;
+  }
+
+  .gate-error { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--danger); min-height: 18px; margin-bottom: 14px; }
+
+  .gate-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #6d28d9, #4338ca);
+    border: none; border-radius: 10px; color: white;
+    font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .gate-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .gate-hint { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); margin-top: 20px; line-height: 1.6; }
+
+  /* APP LAYOUT */
+  #app { display: none; }
+
+  .layout {
+    display: grid; grid-template-columns: 280px 1fr;
+    min-height: 100vh; position: relative; z-index: 1;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh; overflow: hidden;
+  }
+
+  .sidebar-header { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); }
+
+  .sidebar-logo { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+
+  .sidebar-title {
+    font-size: 1.1rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--claude), var(--gemini));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .sidebar-section-label { font-size: 0.63rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); padding: 16px 20px 8px; }
+
+  .history-list { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
+  .history-list::-webkit-scrollbar { width: 3px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .history-item {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    transition: background 0.15s; margin-bottom: 3px;
+    border: 1px solid transparent; position: relative;
+  }
+
+  .history-item:hover { background: var(--surface2); }
+  .history-item.active { background: var(--surface2); border-color: var(--border); }
+
+  .history-item-q { font-size: 0.77rem; color: var(--text); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 22px; }
+
+  .history-item-meta { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--muted); margin-top: 3px; }
+
+  .history-del {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    opacity: 0; transition: opacity 0.15s; font-size: 0.8rem; padding: 4px;
+  }
+
+  .history-item:hover .history-del { opacity: 1; }
+  .history-del:hover { color: var(--danger); }
+
+  .history-empty { font-family: 'DM Mono', monospace; font-size: 0.73rem; color: var(--muted); text-align: center; padding: 20px 16px; line-height: 1.7; }
+
+  .sidebar-footer { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+
+  .sf-btn {
+    flex: 1; padding: 8px 6px; background: transparent;
+    border: 1px solid var(--border); border-radius: 8px; color: var(--muted);
+    font-family: 'Syne', sans-serif; font-size: 0.62rem; font-weight: 600;
+    letter-spacing: 0.5px; cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  }
+
+  .sf-btn:hover { border-color: var(--muted); color: var(--text); }
+  .sf-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* MAIN */
+  .main { padding: 40px 32px 80px; max-width: 900px; }
+
+  header { margin-bottom: 32px; }
+
+  .logo { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; line-height: 1;
+    background: linear-gradient(135deg, var(--claude), var(--gemini));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 8px;
+  }
+
+  .subtitle { color: var(--muted); font-size: 0.83rem; font-family: 'DM Mono', monospace; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+
+  .panel-label { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: block; }
+
+  textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 0.88rem;
+    resize: vertical; min-height: 90px; outline: none;
+    transition: border-color 0.2s; line-height: 1.6;
+  }
+
+  textarea:focus { border-color: var(--muted); }
+
+  .run-btn {
+    display: block; width: 100%; margin-top: 14px; padding: 14px;
+    background: linear-gradient(135deg, #6d28d9, #4338ca);
+    border: none; border-radius: 10px; color: white;
+    font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .run-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .responses-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 20px; }
+
+  .model-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px;
+    opacity: 0; transform: translateY(14px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+
+  .model-card.visible { opacity: 1; transform: translateY(0); }
+
+  .model-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .model-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .model-name { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
+  .model-status { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+
+  .model-response {
+    font-family: 'DM Mono', monospace; font-size: 0.79rem;
+    line-height: 1.7; color: #c8c8e0; white-space: pre-wrap;
+    word-break: break-word; min-height: 50px; max-height: 280px; overflow-y: auto;
+  }
+
+  .model-response::-webkit-scrollbar { width: 3px; }
+  .model-response::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+  .typing-dots span {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--muted);
+    animation: pulse 1.4s infinite ease-in-out;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes pulse { 0%,80%,100%{transform:scale(0.6);opacity:0.3} 40%{transform:scale(1);opacity:1} }
+
+  .judge-panel {
+    background: var(--surface); border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 14px; padding: 24px;
+    opacity: 0; transform: translateY(14px); transition: opacity 0.4s, transform 0.4s;
+  }
+
+  .judge-panel.visible { opacity: 1; transform: translateY(0); }
+
+  .judge-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+
+  .judge-title { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; color: var(--judge); font-weight: 600; }
+
+  .judge-section { margin-bottom: 20px; }
+  .judge-section:last-child { margin-bottom: 0; }
+
+  .jst {
+    font-size: 0.66rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 700;
+    margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+
+  .jst.analysis { color: var(--claude); }
+  .jst.comparison { color: var(--gemini); }
+  .jst.synthesis { color: var(--judge); }
+
+  .jsb { font-family: 'DM Mono', monospace; font-size: 0.81rem; line-height: 1.8; color: #d8d8ec; white-space: pre-wrap; }
+
+  .synthesis-box {
+    background: linear-gradient(135deg, rgba(251,191,36,0.05), rgba(192,132,252,0.05));
+    border: 1px solid rgba(251,191,36,0.2); border-radius: 10px; padding: 18px;
+  }
+
+  .synthesis-box .jsb { color: #eeeeff; }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .error-text { color: var(--danger); }
+
+  /* HISTORY OVERLAY */
+  #historyViewer {
+    display: none; position: fixed; inset: 0;
+    background: rgba(10,10,15,0.88); backdrop-filter: blur(8px);
+    z-index: 500; padding: 30px 16px; overflow-y: auto;
+    align-items: flex-start; justify-content: center;
+  }
+
+  #historyViewer.open { display: flex; }
+
+  .hv-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; width: 100%; max-width: 980px;
+    padding: 32px; position: relative; margin: auto;
+  }
+
+  .hv-close {
+    position: absolute; top: 16px; right: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; transition: color 0.15s;
+  }
+
+  .hv-close:hover { color: var(--text); }
+  .hv-meta { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); margin-bottom: 6px; }
+  .hv-question { font-size: 1.1rem; font-weight: 700; margin-bottom: 24px; line-height: 1.4; }
+
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .history-list { max-height: 180px; }
+    .main { padding: 20px 14px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div id="passwordGate">
+  <div class="gate-box">
+    <div class="gate-icon">🔐</div>
+    <div class="gate-title">AI Arena</div>
+    <p class="gate-sub" id="gateSub">enter your password</p>
+    <div class="gate-input-wrap">
+      <input class="gate-input" type="password" id="pwInput" placeholder="••••••••"
+        onkeydown="if(event.key==='Enter')checkPw()" />
+      <button class="gate-eye" onclick="toggleEye()">👁</button>
+    </div>
+    <div class="gate-error" id="pwError"></div>
+    <button class="gate-btn" onclick="checkPw()">Unlock →</button>
+    <p class="gate-hint">Keys are stored securely on the server — never in your browser.</p>
+  </div>
+</div>
+
+<!-- HISTORY OVERLAY -->
+<div id="historyViewer">
+  <div class="hv-box">
+    <button class="hv-close" onclick="closeViewer()">✕</button>
+    <div class="hv-meta" id="hvMeta"></div>
+    <div class="hv-question" id="hvQuestion"></div>
+    <div class="responses-grid">
+      <div class="model-card visible">
+        <div class="model-header">
+          <div class="model-dot" style="background:var(--claude)"></div>
+          <span class="model-name" style="color:var(--claude)">Claude</span>
+        </div>
+        <div class="model-response" id="hv-claude"></div>
+      </div>
+      <div class="model-card visible">
+        <div class="model-header">
+          <div class="model-dot" style="background:var(--openai)"></div>
+          <span class="model-name" style="color:var(--openai)">ChatGPT</span>
+        </div>
+        <div class="model-response" id="hv-openai"></div>
+      </div>
+      <div class="model-card visible">
+        <div class="model-header">
+          <div class="model-dot" style="background:var(--gemini)"></div>
+          <span class="model-name" style="color:var(--gemini)">Gemini</span>
+        </div>
+        <div class="model-response" id="hv-gemini"></div>
+      </div>
+    </div>
+    <div class="judge-panel visible" style="margin-top:18px">
+      <div class="judge-header">
+        <span>🧠</span>
+        <span class="judge-title">Analysis · Comparison · Synthesis</span>
+      </div>
+      <div id="hv-synthesis"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">Multi-Model AI</div>
+        <div class="sidebar-title">AI Arena</div>
+      </div>
+      <div class="sidebar-section-label">Search History</div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty" id="historyEmpty">No searches yet.<br/>Your history will appear here.</div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="sf-btn" onclick="changePw()">🔑 Change PW</button>
+        <button class="sf-btn danger" onclick="clearHistory()">🗑 Clear All</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header>
+        <div class="logo">Multi-Model Intelligence</div>
+        <h1>AI ARENA</h1>
+        <p class="subtitle">ask once · three answers · one synthesis</p>
+      </header>
+
+      <div class="panel">
+        <span class="panel-label">Your Question</span>
+        <textarea id="questionInput"
+          placeholder="Ask anything… All three models will answer, then Claude will analyze, compare, and synthesize the best possible response."></textarea>
+        <button class="run-btn" id="runBtn" onclick="runAll()">⚡ Run All Models + Synthesize</button>
+      </div>
+
+      <div class="responses-grid" id="responsesGrid" style="display:none">
+        <div class="model-card" id="card-claude">
+          <div class="model-header">
+            <div class="model-dot" style="background:var(--claude)"></div>
+            <span class="model-name" style="color:var(--claude)">Claude</span>
+            <span class="model-status" id="status-claude">waiting</span>
+          </div>
+          <div class="model-response" id="resp-claude"></div>
+        </div>
+        <div class="model-card" id="card-openai">
+          <div class="model-header">
+            <div class="model-dot" style="background:var(--openai)"></div>
+            <span class="model-name" style="color:var(--openai)">ChatGPT</span>
+            <span class="model-status" id="status-openai">waiting</span>
+          </div>
+          <div class="model-response" id="resp-openai"></div>
+        </div>
+        <div class="model-card" id="card-gemini">
+          <div class="model-header">
+            <div class="model-dot" style="background:var(--gemini)"></div>
+            <span class="model-name" style="color:var(--gemini)">Gemini</span>
+            <span class="model-status" id="status-gemini">waiting</span>
+          </div>
+          <div class="model-response" id="resp-gemini"></div>
+        </div>
+      </div>
+
+      <div class="judge-panel" id="judgePanel">
+        <div class="judge-header">
+          <span>🧠</span>
+          <span class="judge-title">Analysis · Comparison · Synthesis</span>
+        </div>
+        <div id="judgeContent"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const K_PW   = 'aiarena_pw';
+const K_HIST = 'aiarena_hist';
+
+// ── PASSWORD ──
+function init() {
+  const hasPw = !!localStorage.getItem(K_PW);
+  if (!hasPw) document.getElementById('gateSub').textContent = 'create a password to get started';
+}
+
+function checkPw() {
+  const val = document.getElementById('pwInput').value;
+  const stored = localStorage.getItem(K_PW);
+  const err = document.getElementById('pwError');
+  if (!stored) {
+    if (val.length < 4) { err.textContent = 'Min 4 characters.'; shake(); return; }
+    localStorage.setItem(K_PW, btoa(val));
+    unlock();
+  } else {
+    if (btoa(val) === stored) unlock();
+    else { err.textContent = 'Wrong password.'; shake(); }
+  }
+}
+
+function shake() {
+  const el = document.getElementById('pwInput');
+  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+  setTimeout(() => el.classList.remove('shake'), 400);
+}
+
+function toggleEye() {
+  const el = document.getElementById('pwInput');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+function unlock() {
+  document.getElementById('passwordGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderHistory();
+}
+
+function changePw() {
+  const np = prompt('New password (min 4 chars):');
+  if (!np || np.length < 4) { alert('Too short or cancelled.'); return; }
+  localStorage.setItem(K_PW, btoa(np));
+  alert('✅ Password updated!');
+}
+
+// ── HISTORY ──
+function getHistory() { try { return JSON.parse(localStorage.getItem(K_HIST) || '[]'); } catch { return []; } }
+
+function pushHistory(entry) {
+  const h = getHistory();
+  h.unshift(entry);
+  if (h.length > 60) h.pop();
+  localStorage.setItem(K_HIST, JSON.stringify(h));
+  renderHistory();
+}
+
+function clearHistory() {
+  if (!confirm('Delete all history?')) return;
+  localStorage.removeItem(K_HIST);
+  renderHistory();
+}
+
+function deleteEntry(i, e) {
+  e.stopPropagation();
+  const h = getHistory(); h.splice(i, 1);
+  localStorage.setItem(K_HIST, JSON.stringify(h));
+  renderHistory();
+}
+
+function fmtDate(ts) {
+  const d = new Date(ts), diff = Date.now() - d;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+  return d.toLocaleDateString();
+}
+
+function renderHistory() {
+  const h = getHistory();
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+  list.querySelectorAll('.history-item').forEach(el => el.remove());
+  if (h.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  h.forEach((entry, i) => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div class="history-item-q">${escHtml(entry.question)}</div>
+      <div class="history-item-meta">${fmtDate(entry.timestamp)}</div>
+      <button class="history-del" title="Delete">✕</button>`;
+    item.querySelector('.history-del').onclick = (e) => deleteEntry(i, e);
+    item.onclick = () => openViewer(i);
+    list.appendChild(item);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── HISTORY VIEWER ──
+function openViewer(index) {
+  const entry = getHistory()[index];
+  if (!entry) return;
+  document.getElementById('hvMeta').textContent = fmtDate(entry.timestamp) + ' · ' + new Date(entry.timestamp).toLocaleTimeString();
+  document.getElementById('hvQuestion').textContent = entry.question;
+  document.getElementById('hv-claude').textContent = entry.responses?.claude || '(no response)';
+  document.getElementById('hv-openai').textContent = entry.responses?.openai || '(no response)';
+  document.getElementById('hv-gemini').textContent = entry.responses?.gemini || '(no response)';
+  const synEl = document.getElementById('hv-synthesis');
+  synEl.innerHTML = '';
+  if (entry.synthesis) renderVerdictInto(entry.synthesis, synEl);
+  else synEl.textContent = '(no synthesis saved)';
+  document.getElementById('historyViewer').classList.add('open');
+  document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === index));
+}
+
+function closeViewer() {
+  document.getElementById('historyViewer').classList.remove('open');
+  document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+}
+
+document.getElementById('historyViewer').addEventListener('click', function(e) {
+  if (e.target === this) closeViewer();
+});
+
+// ── UI HELPERS ──
+function setStatus(m, t) { document.getElementById(`status-${m}`).textContent = t; }
+
+function setResp(m, t, isErr = false) {
+  const el = document.getElementById(`resp-${m}`);
+  el.className = 'model-response' + (isErr ? ' error-text' : '');
+  el.textContent = t;
+}
+
+function showDots(m) {
+  document.getElementById(`resp-${m}`).innerHTML =
+    '<span class="typing-dots"><span></span><span></span><span></span></span>';
+}
+
+// ── VERDICT RENDERER ──
+function renderVerdictInto(text, container) {
+  container.innerHTML = '';
+  const rx = /##\s*(📊 Analysis|🔀 Comparison|✨ Synthesized Answer)/g;
+  const parts = text.split(rx).filter(s => s.trim());
+  const sections = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    if (parts[i+1] !== undefined) sections.push({ title: parts[i].trim(), body: parts[i+1].trim() });
+  }
+  if (!sections.length) { container.textContent = text; return; }
+
+  const cls = { '📊 Analysis': 'analysis', '🔀 Comparison': 'comparison', '✨ Synthesized Answer': 'synthesis' };
+
+  sections.forEach(({ title, body }, idx) => {
+    const isSyn = title.includes('Synthesized');
+    const wrap = document.createElement('div');
+    wrap.className = 'judge-section';
+
+    const t = document.createElement('div');
+    t.className = `jst ${cls[title] || ''}`;
+    t.textContent = title;
+    wrap.appendChild(t);
+
+    if (isSyn) {
+      const box = document.createElement('div');
+      box.className = 'synthesis-box';
+      const b = document.createElement('div');
+      b.className = 'jsb';
+      b.textContent = body;
+      box.appendChild(b);
+      wrap.appendChild(box);
+    } else {
+      const b = document.createElement('div');
+      b.className = 'jsb';
+      b.textContent = body;
+      wrap.appendChild(b);
+    }
+
+    if (idx < sections.length - 1) {
+      const hr = document.createElement('hr');
+      hr.className = 'divider';
+      wrap.appendChild(hr);
+    }
+
+    container.appendChild(wrap);
+  });
+}
+
+function renderVerdict(text) { renderVerdictInto(text, document.getElementById('judgeContent')); }
+
+// ── MAIN RUN (calls backend) ──
+async function runAll() {
+  const question = document.getElementById('questionInput').value.trim();
+  if (!question) { alert('Please enter a question!'); return; }
+
+  const grid = document.getElementById('responsesGrid');
+  const judgePanel = document.getElementById('judgePanel');
+  grid.style.display = 'grid';
+  judgePanel.classList.remove('visible');
+  document.getElementById('judgeContent').innerHTML = '';
+
+  ['claude', 'openai', 'gemini'].forEach((m, i) => {
+    const card = document.getElementById(`card-${m}`);
+    card.classList.remove('visible');
+    setStatus(m, 'loading…');
+    showDots(m);
+    setTimeout(() => card.classList.add('visible'), i * 60);
+  });
+
+  document.getElementById('runBtn').disabled = true;
+
+  let responses = { claude: null, openai: null, gemini: null };
+
+  try {
+    const askRes = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+    const askData = await askRes.json();
+    responses = { claude: askData.claude, openai: askData.openai, gemini: askData.gemini };
+
+    ['claude', 'openai', 'gemini'].forEach(m => {
+      if (responses[m]) {
+        setStatus(m, 'done ✓');
+        setResp(m, responses[m]);
+      } else {
+        setStatus(m, 'error');
+        setResp(m, askData.errors?.[m] || 'No response', true);
+      }
+    });
+  } catch (err) {
+    ['claude', 'openai', 'gemini'].forEach(m => {
+      setStatus(m, 'error'); setResp(m, `Network error: ${err.message}`, true);
+    });
+    document.getElementById('runBtn').disabled = false;
+    return;
+  }
+
+  // Synthesize
+  document.getElementById('judgeContent').innerHTML =
+    '<span class="typing-dots"><span></span><span></span><span></span></span>';
+  judgePanel.classList.add('visible');
+  judgePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  let synthesis = null;
+  try {
+    const synRes = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, responses }),
+    });
+    const synData = await synRes.json();
+    if (synData.error) throw new Error(synData.error);
+    synthesis = synData.synthesis;
+    renderVerdict(synthesis);
+  } catch (err) {
+    document.getElementById('judgeContent').textContent = `Synthesis error: ${err.message}`;
+  }
+
+  document.getElementById('runBtn').disabled = false;
+  pushHistory({ question, responses, synthesis, timestamp: Date.now() });
+}
+
+init();
+</script>
+</body>
+</html>
