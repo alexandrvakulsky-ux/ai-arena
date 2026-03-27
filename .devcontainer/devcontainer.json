@@ -8,7 +8,8 @@
       "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "npm install && ([ -f .env ] || cp .env.example .env)",
+  "postCreateCommand": "chmod +x scripts/codespace-bootstrap.sh 2>/dev/null || true",
+  "postStartCommand": "bash scripts/codespace-bootstrap.sh",
   "customizations": {
     "vscode": {
       "settings": {

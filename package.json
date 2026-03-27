@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "codespace:boot": "bash scripts/codespace-bootstrap.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

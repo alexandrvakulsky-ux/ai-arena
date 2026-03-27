@@ -36,10 +36,12 @@ Open http://localhost:3000 in your browser.
 You can work entirely in GitHub without a local clone:
 
 1. Open the repo on GitHub → **Code** → **Codespaces** → **Create codespace on main** (or your branch).
-2. Wait for the container to build; it runs `npm install` and creates `.env` from `.env.example` if missing.
-3. In the codespace terminal: fill in `.env` with your API keys (or use [Codespaces secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-secrets-for-your-codespaces)).
-4. Run: `npm start`
-5. When port **3000** is forwarded, open the forwarded URL from the **Ports** tab.
+2. On each start, `.devcontainer` runs **`scripts/codespace-bootstrap.sh`**: `npm install`, ensures `.env`, then starts the app in the background on port **3000** if nothing is already listening.
+3. **API keys (pick one):**
+   - Add [Codespaces secrets](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-secrets-for-your-codespaces) named **`ANTHROPIC_API_KEY`**, **`OPENAI_API_KEY`**, **`GOOGLE_API_KEY`** (optional: **`APP_PASSWORD`**, **`PORT`**). They become environment variables; the first time `.env` is missing/empty, the bootstrap writes `.env` from them.
+   - Or edit `.env` manually once; it is gitignored and persists in the codespace.
+4. Open the forwarded URL for port **3000** from the **Ports** tab (or the notification).
+5. If the server did not start, run `npm run codespace:boot` or check `tail -f /tmp/ai-arena-server.log`.
 
 ---
 
