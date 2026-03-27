@@ -114,40 +114,53 @@ app.post('/api/synthesize', requireAuth, async (req, res) => {
   const { question, responses } = req.body;
   if (!question || !responses) return res.status(400).json({ error: 'question and responses required' });
 
-  const prompt = `You are an expert analyst and synthesizer. A user asked:
+  const prompt = `You are a senior technical editor. A user asked:
 
 "${question}"
 
-Three AI models responded:
+The three models responded as follows:
 
 --- CLAUDE ---
-${responses.claude || '[No response]'}
+${responses.claude || '[No response — treat as failed]'}
 
 --- CHATGPT ---
-${responses.openai || '[No response]'}
+${responses.openai || '[No response — treat as failed]'}
 
 --- GEMINI ---
-${responses.gemini || '[No response]'}
+${responses.gemini || '[No response — treat as failed]'}
 
-Your task has TWO parts. Use these exact section headers:
+Produce exactly TWO sections using the headers below. Do not add any other top-level headers.
+
+---
 
 ## 📊 Analysis
-For each model that responded, evaluate it using exactly this format (keep the ### headers exactly as shown, no extra text before the first ###):
+
+Evaluate each model. Use exactly this block format — no text before the first ###, no deviations:
 
 ### Claude
-[2-3 sentences: what it got right, what it missed, overall approach]
+2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
 
 ### ChatGPT
-[2-3 sentences: what it got right, what it missed, overall approach]
+2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
 
 ### Gemini
-[2-3 sentences: what it got right, what it missed, overall approach]
+2–3 sentences: accuracy, depth, what it nailed, what it missed or got wrong. If the model failed to respond, write one sentence saying so.
 Score: X/10
 
+Scoring guide: 9–10 = essentially complete and accurate; 7–8 = solid with minor gaps; 5–6 = partially useful; 3–4 = superficial or off-target; 1–2 = mostly wrong or irrelevant; 0 = no response.
+
+---
+
 ## ✨ Synthesized Answer
-Write the single best possible answer by combining the strongest elements from all three. Be comprehensive, accurate, and clear — as if written by one expert with access to all three perspectives. Do not mention model names in this section.`;
+
+Write the single best answer to the user's question. Rules:
+- No meta-commentary about the models or this process — write as if you are the expert answering directly.
+- Do not repeat the analysis above.
+- Structure with a short intro sentence, then use ## / ### headings and bullet points where they add clarity.
+- If the question involves comparing options, metrics, or tradeoffs, include a concise markdown table.
+- Tone: expert, direct, no filler. Every sentence must earn its place.`;
 
   try {
     const synthesis = await callClaude(prompt, 1800);
