@@ -10,6 +10,24 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
+const APP_PASSWORD = process.env.APP_PASSWORD || null;
+
+function requireAuth(req, res, next) {
+  if (!APP_PASSWORD) return next();
+  const token = req.headers['x-app-token'];
+  if (token && Buffer.from(token, 'base64').toString() === APP_PASSWORD) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
+app.post('/api/auth', (req, res) => {
+  if (!APP_PASSWORD) return res.json({ ok: true });
+  const { password } = req.body;
+  if (password === APP_PASSWORD) {
+    res.json({ ok: true, token: Buffer.from(password).toString('base64') });
+  } else {
+    res.status(401).json({ ok: false, error: 'Wrong password' });
+  }
+});
 
 // ── Claude ──
 async function callClaude(prompt, maxTokens = 1000) {
@@ -69,7 +87,7 @@ async function callGemini(prompt) {
 }
 
 // ── /api/ask  — run all 3 models in parallel ──
-app.post('/api/ask', async (req, res) => {
+app.post('/api/ask', requireAuth, async (req, res) => {
   const { question } = req.body;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
@@ -92,7 +110,7 @@ app.post('/api/ask', async (req, res) => {
 });
 
 // ── /api/synthesize  — Claude judges + synthesizes ──
-app.post('/api/synthesize', async (req, res) => {
+app.post('/api/synthesize', requireAuth, async (req, res) => {
   const { question, responses } = req.body;
   if (!question || !responses) return res.status(400).json({ error: 'question and responses required' });
 

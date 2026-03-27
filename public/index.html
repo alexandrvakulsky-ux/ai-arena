@@ -443,26 +443,31 @@
 </div>
 
 <script>
-const K_PW   = 'aiarena_pw';
-const K_HIST = 'aiarena_hist';
+const K_TOKEN = 'aiarena_token';
+const K_HIST  = 'aiarena_hist';
+
+function getToken() { return localStorage.getItem(K_TOKEN) || ''; }
 
 // ── PASSWORD ──
 function init() {
-  const hasPw = !!localStorage.getItem(K_PW);
-  if (!hasPw) document.getElementById('gateSub').textContent = 'create a password to get started';
+  const token = getToken();
+  if (token) {
+    fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: atob(token) }) })
+      .then(r => r.json()).then(d => { if (d.ok) unlock(); });
+  }
 }
 
-function checkPw() {
+async function checkPw() {
   const val = document.getElementById('pwInput').value;
-  const stored = localStorage.getItem(K_PW);
   const err = document.getElementById('pwError');
-  if (!stored) {
-    if (val.length < 4) { err.textContent = 'Min 4 characters.'; shake(); return; }
-    localStorage.setItem(K_PW, btoa(val));
+  if (!val) { err.textContent = 'Enter a password.'; shake(); return; }
+  const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: val }) });
+  const data = await res.json();
+  if (data.ok) {
+    localStorage.setItem(K_TOKEN, data.token || btoa(val));
     unlock();
   } else {
-    if (btoa(val) === stored) unlock();
-    else { err.textContent = 'Wrong password.'; shake(); }
+    err.textContent = 'Wrong password.'; shake();
   }
 }
 
@@ -484,10 +489,7 @@ function unlock() {
 }
 
 function changePw() {
-  const np = prompt('New password (min 4 chars):');
-  if (!np || np.length < 4) { alert('Too short or cancelled.'); return; }
-  localStorage.setItem(K_PW, btoa(np));
-  alert('✅ Password updated!');
+  alert('To change the password, update APP_PASSWORD in your Railway environment variables.');
 }
 
 // ── HISTORY ──
@@ -662,7 +664,7 @@ async function runAll() {
   try {
     const askRes = await fetch('/api/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-app-token': getToken() },
       body: JSON.stringify({ question }),
     });
     const askData = await askRes.json();
@@ -695,7 +697,7 @@ async function runAll() {
   try {
     const synRes = await fetch('/api/synthesize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-app-token': getToken() },
       body: JSON.stringify({ question, responses }),
     });
     const synData = await synRes.json();
