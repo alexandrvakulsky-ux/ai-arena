@@ -223,6 +223,12 @@
   .model-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .model-name { font-size: 0.68rem; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
   .model-status { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
+  .expand-btn {
+    background: none; border: 1px solid var(--border); border-radius: 5px;
+    color: var(--muted); cursor: pointer; font-size: 0.62rem; padding: 2px 7px;
+    font-family: 'Syne', sans-serif; transition: all 0.15s; white-space: nowrap;
+  }
+  .expand-btn:hover { border-color: var(--muted); color: var(--text); }
 
   .model-response {
     font-family: 'Syne', sans-serif; font-size: 0.84rem;
@@ -280,8 +286,10 @@
   .jsb p { margin: 0 0 0.65em; }
   .jsb p:last-child { margin-bottom: 0; }
   .jsb strong { color: #eeeeff; font-weight: 600; }
-  .jsb ul,.jsb ol { padding-left: 1.4em; margin: 0.4em 0; }
-  .jsb li { margin-bottom: 0.3em; }
+  .jsb ul,.jsb ol { padding-left: 1.8em; margin: 0.4em 0; }
+  .jsb li { margin-bottom: 0.3em; padding-left: 0.2em; }
+  .model-response ul,.model-response ol { padding-left: 1.8em; margin: 0.4em 0; }
+  .model-response li { margin-bottom: 0.3em; padding-left: 0.2em; }
 
   .synthesis-box {
     background: linear-gradient(135deg, rgba(251,191,36,0.05), rgba(192,132,252,0.05));
@@ -292,6 +300,29 @@
 
   hr.divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   .error-text { color: var(--danger); }
+
+  /* EXPAND OVERLAY */
+  #expandOverlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(10,10,15,0.88); backdrop-filter: blur(8px);
+    z-index: 600; padding: 30px 16px; overflow-y: auto;
+    align-items: flex-start; justify-content: center;
+  }
+  #expandOverlay.open { display: flex; }
+  .expand-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; width: 100%; max-width: 780px;
+    padding: 32px; position: relative; margin: auto;
+  }
+  .expand-box .model-response { max-height: none; font-size: 0.88rem; line-height: 1.8; }
+  .expand-close {
+    position: absolute; top: 16px; right: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--muted); cursor: pointer;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; transition: color 0.15s;
+  }
+  .expand-close:hover { color: var(--text); }
 
   /* HISTORY OVERLAY */
   #historyViewer {
@@ -387,6 +418,15 @@
   </div>
 </div>
 
+<!-- EXPAND OVERLAY -->
+<div id="expandOverlay" onclick="if(event.target===this)closeExpand()">
+  <div class="expand-box">
+    <button class="expand-close" onclick="closeExpand()">✕</button>
+    <div class="model-header" id="expandHeader"></div>
+    <div class="model-response" id="expandContent"></div>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div id="app">
   <div class="layout">
@@ -425,6 +465,7 @@
             <div class="model-dot" style="background:var(--claude)"></div>
             <span class="model-name" style="color:var(--claude)">Claude</span>
             <span class="model-status" id="status-claude">waiting</span>
+            <button class="expand-btn" onclick="expandResp('claude','Claude','var(--claude)')">Expand</button>
           </div>
           <div class="model-response" id="resp-claude"></div>
         </div>
@@ -433,6 +474,7 @@
             <div class="model-dot" style="background:var(--openai)"></div>
             <span class="model-name" style="color:var(--openai)">ChatGPT</span>
             <span class="model-status" id="status-openai">waiting</span>
+            <button class="expand-btn" onclick="expandResp('openai','ChatGPT','var(--openai)')">Expand</button>
           </div>
           <div class="model-response" id="resp-openai"></div>
         </div>
@@ -441,6 +483,7 @@
             <div class="model-dot" style="background:var(--gemini)"></div>
             <span class="model-name" style="color:var(--gemini)">Gemini</span>
             <span class="model-status" id="status-gemini">waiting</span>
+            <button class="expand-btn" onclick="expandResp('gemini','Gemini','var(--gemini)')">Expand</button>
           </div>
           <div class="model-response" id="resp-gemini"></div>
         </div>
@@ -505,6 +548,19 @@ function unlock() {
 
 function changePw() {
   alert('To change the password, update APP_PASSWORD in your Railway environment variables.');
+}
+
+function expandResp(model, name, color) {
+  const content = document.getElementById(`resp-${model}`).innerHTML;
+  if (!content) return;
+  document.getElementById('expandHeader').innerHTML =
+    `<div class="model-dot" style="background:${color}"></div><span class="model-name" style="color:${color}">${name}</span>`;
+  document.getElementById('expandContent').innerHTML = content;
+  document.getElementById('expandOverlay').classList.add('open');
+}
+
+function closeExpand() {
+  document.getElementById('expandOverlay').classList.remove('open');
 }
 
 // ── HISTORY ──
