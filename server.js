@@ -129,7 +129,7 @@ ${responses.openai || '[No response]'}
 --- GEMINI ---
 ${responses.gemini || '[No response]'}
 
-Your task has THREE parts. Use these exact section headers:
+Your task has TWO parts. Use these exact section headers:
 
 ## 📊 Analysis
 For each model that responded, evaluate it using exactly this format (keep the ### headers exactly as shown, no extra text before the first ###):
@@ -145,9 +145,6 @@ Score: X/10
 ### Gemini
 [2-3 sentences: what it got right, what it missed, overall approach]
 Score: X/10
-
-## 🔀 Comparison
-In 3-5 sentences, highlight key differences — where they agree, where they diverge, and what unique insight each brought.
 
 ## ✨ Synthesized Answer
 Write the single best possible answer by combining the strongest elements from all three. Be comprehensive, accurate, and clear — as if written by one expert with access to all three perspectives. Do not mention model names in this section.`;

@@ -664,7 +664,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 22px 22px 24px;
-    max-width: 720px;
     opacity: 0;
     transition: opacity 0.12s ease;
   }
@@ -714,16 +713,16 @@
 
   /* ANALYSIS SCORE CARDS */
   .analysis-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
   }
 
   .analysis-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 16px 16px;
+    padding: 16px;
   }
 
   .ac-header {
@@ -1062,7 +1061,6 @@
     }
     .history-list { max-height: 200px; }
     .main { padding: 4px 0 32px; }
-    .judge-panel { max-width: none; }
     header, .panel { max-width: none; }
   }
 
@@ -1124,7 +1122,7 @@
     <div class="judge-panel visible" style="margin-top:18px">
       <div class="judge-header">
         <span class="judge-kicker">Output</span>
-        <span class="judge-title">Analysis · Comparison · Synthesis</span>
+        <span class="judge-title">Analysis · Synthesis</span>
       </div>
       <div id="hv-synthesis"></div>
     </div>
@@ -1205,7 +1203,7 @@
       <div class="judge-panel" id="judgePanel">
         <div class="judge-header">
           <span class="judge-kicker">Output</span>
-          <span class="judge-title">Analysis · Comparison · Synthesis</span>
+          <span class="judge-title">Analysis · Synthesis</span>
         </div>
         <div id="judgeContent"></div>
       </div>
@@ -1418,7 +1416,7 @@ function renderAnalysisCards(body) {
 // ── VERDICT RENDERER ──
 function renderVerdictInto(text, container) {
   container.innerHTML = '';
-  const rx = /##\s*(📊 Analysis|🔀 Comparison|✨ Synthesized Answer)/g;
+  const rx = /##\s*(📊 Analysis|✨ Synthesized Answer)/g;
   const parts = text.split(rx).filter(s => s.trim());
   const sections = [];
   for (let i = 0; i < parts.length; i += 2) {
@@ -1426,8 +1424,8 @@ function renderVerdictInto(text, container) {
   }
   if (!sections.length) { container.innerHTML = marked.parse(text); return; }
 
-  const cls = { '📊 Analysis': 'analysis', '🔀 Comparison': 'comparison', '✨ Synthesized Answer': 'synthesis' };
-  const displayTitle = { '📊 Analysis': 'Analysis', '🔀 Comparison': 'Comparison', '✨ Synthesized Answer': 'Synthesized Answer' };
+  const cls = { '📊 Analysis': 'analysis', '✨ Synthesized Answer': 'synthesis' };
+  const displayTitle = { '📊 Analysis': 'Analysis', '✨ Synthesized Answer': 'Synthesized Answer' };
 
   sections.forEach(({ title, body }, idx) => {
     const isAnalysis = title.includes('Analysis');
