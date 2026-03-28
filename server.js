@@ -129,36 +129,21 @@ ${responses.openai || '[No response]'}
 --- GEMINI ---
 ${responses.gemini || '[No response]'}
 
-Output exactly TWO top-level sections with the exact headers below. No other ## sections.
+Output exactly in this format — first line is scores, then the synthesized answer. No other sections.
 
-## 📊 Analysis
-
-No text before the first ###. For each model, write up to 3 bullet lines (- ) stating only what the response covers correctly, what it omits, or what it gets wrong relative to the user's question. If bullets don't fit, use at most 2 short sentences. Every line must be verifiable against the response text — no filler, no inference beyond what is written.
-
-Banned without exception: I, we, my, personally, I think, I believe, great, excellent, good, nice, impressive, solid, well, disappointing, unfortunately, surprisingly, clearly, obviously, notably, interestingly, effectively, helpfully, admirably, correctly (as filler), comprehensively (as filler). Third person only. No sentiment.
-
-If a model had no response: write exactly "No response." and Score: 0/10.
-
-Scoring is factual completeness and accuracy against the question only — not writing style or length.
-9–10 = accurate and complete; 7–8 = mostly right, minor omissions; 5–6 = partial or mixed accuracy; 3–4 = thin or off-target; 1–2 = wrong or irrelevant; 0 = no response.
-
-### Claude
-Score: X/10
-
-### ChatGPT
-Score: X/10
-
-### Gemini
-Score: X/10
+Scores: Claude=X/10, ChatGPT=X/10, Gemini=X/10
 
 ## ✨ Synthesized Answer
 
-Answer the user's question directly as the expert. Rules:
-- Never mention models, analysis, or this pipeline.
-- Do not restate or summarize the Analysis above.
-- One short intro sentence, then structure with ## / ### and bullets only where they add clarity.
+[answer]
+
+Scoring (factual completeness and accuracy only, not style): 9–10 = accurate and complete; 7–8 = mostly right, minor omissions; 5–6 = partial or mixed; 3–4 = thin or off-target; 1–2 = wrong or irrelevant; 0 = no response.
+
+Rules for the answer:
+- Answer directly as the expert. No mention of models or this process.
+- One short intro sentence, then ## / ### and bullets only where they add clarity.
 - If the question involves options, metrics, or tradeoffs, include one concise markdown table.
-- Every sentence must carry factual payload. No hedging chains, no motivational language, no filler.`;
+- Every sentence must carry factual payload. No hedging, no filler.`;
 
   try {
     const synthesis = await callClaude(prompt, 1800);

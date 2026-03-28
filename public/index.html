@@ -555,6 +555,17 @@
     background: var(--danger-surface);
     border-color: var(--danger-border);
   }
+
+  .model-score {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    opacity: 0.9;
+  }
   .model-response.collapsed {
     max-height: 160px;
     overflow: hidden;
@@ -1173,7 +1184,7 @@
     <div class="judge-panel visible" style="margin-top:18px">
       <div class="judge-header">
         <span class="judge-kicker">Output</span>
-        <span class="judge-title">Analysis · Synthesis</span>
+        <span class="judge-title">Synthesis</span>
       </div>
       <div id="hv-synthesis"></div>
     </div>
@@ -1227,6 +1238,7 @@
             <div class="model-dot" style="background:var(--claude)"></div>
             <span class="model-name">Claude</span>
             <span class="model-status status-idle" id="status-claude">waiting</span>
+            <span class="model-score" id="score-claude" hidden></span>
           </div>
           <div class="model-response collapsed" id="resp-claude"></div>
           <button class="toggle-btn" id="toggle-claude" onclick="toggleResp('claude')">Show full response ↓</button>
@@ -1236,6 +1248,7 @@
             <div class="model-dot" style="background:var(--openai)"></div>
             <span class="model-name">ChatGPT</span>
             <span class="model-status status-idle" id="status-openai">waiting</span>
+            <span class="model-score" id="score-openai" hidden></span>
           </div>
           <div class="model-response collapsed" id="resp-openai"></div>
           <button class="toggle-btn" id="toggle-openai" onclick="toggleResp('openai')">Show full response ↓</button>
@@ -1245,6 +1258,7 @@
             <div class="model-dot" style="background:var(--gemini)"></div>
             <span class="model-name">Gemini</span>
             <span class="model-status status-idle" id="status-gemini">waiting</span>
+            <span class="model-score" id="score-gemini" hidden></span>
           </div>
           <div class="model-response collapsed" id="resp-gemini"></div>
           <button class="toggle-btn" id="toggle-gemini" onclick="toggleResp('gemini')">Show full response ↓</button>
@@ -1254,7 +1268,7 @@
       <div class="judge-panel" id="judgePanel">
         <div class="judge-header">
           <span class="judge-kicker">Output</span>
-          <span class="judge-title">Analysis · Synthesis</span>
+          <span class="judge-title">Synthesis</span>
         </div>
         <div id="judgeContent"></div>
       </div>
@@ -1439,96 +1453,54 @@ function showDots(m) {
     '<span class="typing-dots"><span></span><span></span><span></span></span>';
 }
 
-// ── ANALYSIS CARD RENDERER ──
-function renderAnalysisCards(body) {
-  const wrap = document.createElement('div');
-  wrap.className = 'analysis-cards';
-  const modelMeta = {
-    'claude':  { color: 'var(--claude)',  label: 'Claude'  },
-    'chatgpt': { color: 'var(--openai)', label: 'ChatGPT' },
-    'gemini':  { color: 'var(--gemini)', label: 'Gemini'  },
-  };
-  const blocks = body.split(/^###\s+/m).filter(s => s.trim());
-  blocks.forEach(block => {
-    const lines = block.split('\n');
-    const header = lines[0].trim();
-    const key = header.toLowerCase().replace(/\s+/g, '');
-    const meta = modelMeta[key] || { color: 'var(--muted)', label: header };
-    const scoreMatch = block.match(/Score:\s*(\d+)\/10/i);
-    const score = scoreMatch ? parseInt(scoreMatch[1]) : null;
-    const text = lines.slice(1).join('\n').replace(/Score:\s*\d+\/10/gi, '').trim();
-    const card = document.createElement('div');
-    card.className = 'analysis-card';
-    card.style.borderLeft = `3px solid ${meta.color}`;
-    card.innerHTML =
-      `<div class="ac-header">` +
-        `<div class="model-dot" style="background:${meta.color}"></div>` +
-        `<span class="ac-name">${meta.label}</span>` +
-        (score !== null ? `<span class="ac-score" style="color:${meta.color}">${score}/10</span>` : '') +
-      `</div>` +
-      `<div class="ac-body">` +
-        (score !== null ? `<div class="ac-bar"><div class="ac-fill" style="width:${score * 10}%;background:${meta.color}"></div></div>` : '') +
-        `<div class="ac-text">${marked.parse(text)}</div>` +
-      `</div>`;
-    wrap.appendChild(card);
+// ── SCORE PARSER ──
+function applyScores(text) {
+  const m = text.match(/^Scores:\s*Claude=(\d+)\/10,\s*ChatGPT=(\d+)\/10,\s*Gemini=(\d+)\/10/im);
+  if (!m) return text;
+  [['claude', m[1], 'var(--claude)'], ['openai', m[2], 'var(--openai)'], ['gemini', m[3], 'var(--gemini)']].forEach(([id, val, color]) => {
+    const el = document.getElementById(`score-${id}`);
+    if (!el) return;
+    el.textContent = `${val}/10`;
+    el.style.color = color;
+    el.hidden = false;
   });
-  if (!wrap.children.length) wrap.innerHTML = marked.parse(body);
-  return wrap;
+  return text.replace(/^Scores:.*$/im, '').trim();
+}
+
+function resetScores() {
+  ['claude', 'openai', 'gemini'].forEach(id => {
+    const el = document.getElementById(`score-${id}`);
+    if (el) { el.hidden = true; el.textContent = ''; }
+  });
 }
 
 // ── VERDICT RENDERER ──
 function renderVerdictInto(text, container) {
   container.innerHTML = '';
-  const rx = /##\s*(📊 Analysis|✨ Synthesized Answer)/g;
+  // Strip scores line (handled separately on main view; strip silently for history)
+  text = text.replace(/^Scores:.*$/im, '').trim();
+  const rx = /##\s*(✨ Synthesized Answer)/g;
   const parts = text.split(rx).filter(s => s.trim());
   const sections = [];
   for (let i = 0; i < parts.length; i += 2) {
-    if (parts[i+1] !== undefined) sections.push({ title: parts[i].trim(), body: parts[i+1].trim() });
+    if (parts[i + 1] !== undefined) sections.push({ title: parts[i].trim(), body: parts[i + 1].trim() });
   }
   if (!sections.length) { container.innerHTML = marked.parse(text); return; }
-
-  const cls = { '📊 Analysis': 'analysis', '✨ Synthesized Answer': 'synthesis' };
-  const displayTitle = { '📊 Analysis': 'Analysis', '✨ Synthesized Answer': 'Synthesized Answer' };
-
-  sections.forEach(({ title, body }, idx) => {
-    const isAnalysis = title.includes('Analysis');
-    const isSyn = title.includes('Synthesized');
-    const wrap = document.createElement('div');
-    wrap.className = 'judge-section';
-
-    const t = document.createElement('div');
-    t.className = `jst ${cls[title] || ''}`;
-    t.textContent = displayTitle[title] || title;
-    wrap.appendChild(t);
-
-    if (isAnalysis) {
-      wrap.appendChild(renderAnalysisCards(body));
-    } else if (isSyn) {
-      const box = document.createElement('div');
-      box.className = 'synthesis-box';
-      const b = document.createElement('div');
-      b.className = 'jsb';
-      b.innerHTML = marked.parse(body);
-      box.appendChild(b);
-      wrap.appendChild(box);
-    } else {
-      const b = document.createElement('div');
-      b.className = 'jsb';
-      b.innerHTML = marked.parse(body);
-      wrap.appendChild(b);
-    }
-
-    if (idx < sections.length - 1) {
-      const hr = document.createElement('hr');
-      hr.className = 'divider';
-      wrap.appendChild(hr);
-    }
-
-    container.appendChild(wrap);
+  sections.forEach(({ body }) => {
+    const box = document.createElement('div');
+    box.className = 'synthesis-box';
+    const b = document.createElement('div');
+    b.className = 'jsb';
+    b.innerHTML = marked.parse(body);
+    box.appendChild(b);
+    container.appendChild(box);
   });
 }
 
-function renderVerdict(text) { renderVerdictInto(text, document.getElementById('judgeContent')); }
+function renderVerdict(text) {
+  const cleaned = applyScores(text);
+  renderVerdictInto(cleaned, document.getElementById('judgeContent'));
+}
 
 // ── MAIN RUN (calls backend) ──
 async function runAll() {
@@ -1540,6 +1512,7 @@ async function runAll() {
   grid.style.display = 'grid';
   judgePanel.classList.remove('visible');
   document.getElementById('judgeContent').innerHTML = '';
+  resetScores();
 
   ['claude', 'openai', 'gemini'].forEach((m) => {
     const card = document.getElementById(`card-${m}`);
