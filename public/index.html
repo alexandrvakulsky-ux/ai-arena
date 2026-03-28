@@ -1281,7 +1281,10 @@
 const K_TOKEN = 'aiarena_token';
 const K_HIST  = 'aiarena_hist';
 
-function getToken() { return localStorage.getItem(K_TOKEN) || ''; }
+// sessionStorage: clears when tab closes, not accessible across tabs
+function getToken()       { return sessionStorage.getItem(K_TOKEN) || ''; }
+function setToken(t)      { sessionStorage.setItem(K_TOKEN, t); }
+function clearToken()     { sessionStorage.removeItem(K_TOKEN); }
 
 // ── PASSWORD ──
 function init() {
