@@ -127,29 +127,40 @@ app.post('/api/ask', requireAuth, async (req, res) => {
   });
 });
 
-// ── /api/synthesize — Claude judges + synthesizes ──
+// ── /api/synthesize — all 3 models judge anonymized responses, Claude synthesizes ──
 app.post('/api/synthesize', requireAuth, async (req, res) => {
   const { question, responses } = req.body;
   if (!question || !responses) return res.status(400).json({ error: 'question and responses required' });
 
-  const prompt = `You are a fact-checker. A user asked:
+  // Shuffle model→label mapping so no model knows which response is its own
+  const models = ['claude', 'openai', 'gemini'];
+  const shuffled = [...models].sort(() => Math.random() - 0.5);
+  const labelOf = {};   // labelOf['claude'] = 'A'
+  const modelOf = {};   // modelOf['A'] = 'claude'
+  shuffled.forEach((model, i) => {
+    const label = String.fromCharCode(65 + i); // A, B, C
+    labelOf[model] = label;
+    modelOf[label] = model;
+  });
+
+  const makePrompt = (question, responses) => `You are a fact-checker. A user asked:
 
 "${question}"
 
-The three models responded:
+Three AI responses (identities hidden):
 
---- CLAUDE ---
+--- Response ${labelOf['claude']} ---
 ${responses.claude || '[No response]'}
 
---- CHATGPT ---
+--- Response ${labelOf['openai']} ---
 ${responses.openai || '[No response]'}
 
---- GEMINI ---
+--- Response ${labelOf['gemini']} ---
 ${responses.gemini || '[No response]'}
 
 Output exactly in this format — first line is scores, then the synthesized answer. No other sections.
 
-Scores: Claude=X/10, ChatGPT=X/10, Gemini=X/10
+Scores: ${labelOf['claude']}=X/10, ${labelOf['openai']}=X/10, ${labelOf['gemini']}=X/10
 
 ## ✨ Synthesized Answer
 
@@ -163,12 +174,49 @@ Rules for the answer:
 - If the question involves options, metrics, or tradeoffs, include one concise markdown table.
 - Every sentence must carry factual payload. No hedging, no filler.`;
 
-  try {
-    const synthesis = await callClaude(prompt, 1800);
-    res.json({ synthesis });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  const prompt = makePrompt(question, responses);
+
+  // All 3 models judge in parallel (each sees anonymized A/B/C — no self-bias)
+  const [claudeResult, openaiResult, geminiResult] = await Promise.allSettled([
+    callClaude(prompt, 1800),
+    process.env.OPENAI_API_KEY ? callOpenAI(prompt) : Promise.reject(new Error('No OpenAI key')),
+    process.env.GOOGLE_API_KEY ? callGemini(prompt) : Promise.reject(new Error('No Gemini key')),
+  ]);
+
+  const claudeText = claudeResult.status === 'fulfilled' ? claudeResult.value : null;
+  if (!claudeText) return res.status(500).json({ error: claudeResult.reason?.message || 'Synthesis failed' });
+
+  // Parse anonymous scores from each judge
+  function parseScores(text) {
+    if (!text) return null;
+    const m = text.match(/^Scores:\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10/im);
+    if (!m) return null;
+    return { [m[1]]: parseInt(m[2]), [m[3]]: parseInt(m[4]), [m[5]]: parseInt(m[6]) };
   }
+
+  const judgeScores = [
+    parseScores(claudeResult.status === 'fulfilled' ? claudeResult.value : null),
+    parseScores(openaiResult.status === 'fulfilled' ? openaiResult.value : null),
+    parseScores(geminiResult.status === 'fulfilled' ? geminiResult.value : null),
+  ].filter(Boolean);
+
+  // Average scores per label, then map back to model names
+  const avgFor = (label) => {
+    const vals = judgeScores.map(s => s[label]).filter(v => v != null);
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : '?';
+  };
+
+  const finalScores = {
+    claude: avgFor(labelOf['claude']),
+    openai: avgFor(labelOf['openai']),
+    gemini: avgFor(labelOf['gemini']),
+  };
+
+  // Replace anonymous scores line in Claude's synthesis with named averaged scores
+  const scoresLine = `Scores: Claude=${finalScores.claude}/10, ChatGPT=${finalScores.openai}/10, Gemini=${finalScores.gemini}/10`;
+  const synthesis = claudeText.replace(/^Scores:.*$/im, scoresLine);
+
+  res.json({ synthesis });
 });
 
 app.listen(PORT, () => {
