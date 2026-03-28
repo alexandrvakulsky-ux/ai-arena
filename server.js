@@ -336,7 +336,7 @@ Rules:
 - Every sentence must carry factual payload. No hedging, no filler.`;
 
   try {
-    const claudeSynthesis = await callClaude(synthesisPrompt, 1800);
+    const claudeSynthesis = await callClaude(synthesisPrompt, 1800, { thinking: true, thinkingBudget: 8000 });
     const scoresLine = `Scores: Claude=${finalScores.claude}/10, ChatGPT=${finalScores.openai}/10, Gemini=${finalScores.gemini}/10`;
     const synthesis  = claudeSynthesis.replace(/^Scores:.*$/im, scoresLine);
     res.json({ synthesis });
