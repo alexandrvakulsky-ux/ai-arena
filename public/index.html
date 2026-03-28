@@ -555,19 +555,33 @@
     background: var(--danger-surface);
     border-color: var(--danger-border);
   }
-  .expand-btn {
-    background: none;
-    border: none;
-    color: var(--dimmer);
-    cursor: pointer;
-    font-size: 11px;
-    padding: 0;
-    font-family: var(--font);
-    transition: color 0.15s;
+  .model-response.collapsed {
+    max-height: 160px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
   }
 
-  .expand-btn:hover {
+  .toggle-btn {
+    display: block;
+    width: 100%;
+    padding: 9px 20px;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--dim);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.12s, background 0.12s;
+    letter-spacing: 0.01em;
+  }
+
+  .toggle-btn:hover {
     color: var(--muted);
+    background: rgba(255,255,255,0.02);
   }
 
   .model-response {
@@ -766,15 +780,6 @@
     flex: 1;
   }
 
-  .ac-score {
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 1;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    color: var(--muted);
-  }
-
   .ac-score em {
     font-size: 12px;
     font-weight: 500;
@@ -797,6 +802,14 @@
     opacity: 0.85;
   }
 
+  .ac-score {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
   .ac-text {
     font-size: 13px;
     line-height: 1.6;
@@ -805,6 +818,20 @@
 
   .ac-text p { margin: 0; }
   .ac-text p + p { margin-top: 0.4em; }
+
+  .ac-text ul,
+  .ac-text ol {
+    padding-left: 1.2em;
+    margin: 0;
+    list-style: disc;
+  }
+
+  .ac-text li {
+    margin-bottom: 0.35em;
+    line-height: 1.55;
+  }
+
+  .ac-text li:last-child { margin-bottom: 0; }
 
   .jsb {
     font-family: var(--font);
@@ -1198,27 +1225,27 @@
             <div class="model-dot" style="background:var(--claude)"></div>
             <span class="model-name">Claude</span>
             <span class="model-status status-idle" id="status-claude">waiting</span>
-            <button class="expand-btn" onclick="expandResp('claude','Claude','var(--claude)')">Expand</button>
           </div>
-          <div class="model-response" id="resp-claude"></div>
+          <div class="model-response collapsed" id="resp-claude"></div>
+          <button class="toggle-btn" id="toggle-claude" onclick="toggleResp('claude')">Show full response ↓</button>
         </div>
         <div class="model-card" id="card-openai">
           <div class="model-header">
             <div class="model-dot" style="background:var(--openai)"></div>
             <span class="model-name">ChatGPT</span>
             <span class="model-status status-idle" id="status-openai">waiting</span>
-            <button class="expand-btn" onclick="expandResp('openai','ChatGPT','var(--openai)')">Expand</button>
           </div>
-          <div class="model-response" id="resp-openai"></div>
+          <div class="model-response collapsed" id="resp-openai"></div>
+          <button class="toggle-btn" id="toggle-openai" onclick="toggleResp('openai')">Show full response ↓</button>
         </div>
         <div class="model-card" id="card-gemini">
           <div class="model-header">
             <div class="model-dot" style="background:var(--gemini)"></div>
             <span class="model-name">Gemini</span>
             <span class="model-status status-idle" id="status-gemini">waiting</span>
-            <button class="expand-btn" onclick="expandResp('gemini','Gemini','var(--gemini)')">Expand</button>
           </div>
-          <div class="model-response" id="resp-gemini"></div>
+          <div class="model-response collapsed" id="resp-gemini"></div>
+          <button class="toggle-btn" id="toggle-gemini" onclick="toggleResp('gemini')">Show full response ↓</button>
         </div>
       </div>
 
@@ -1392,8 +1419,17 @@ function setStatus(m, t) {
 
 function setResp(m, t, isErr = false) {
   const el = document.getElementById(`resp-${m}`);
-  el.className = 'model-response' + (isErr ? ' error-text' : '');
+  el.className = 'model-response' + (isErr ? ' error-text' : ' collapsed');
   el.innerHTML = isErr ? escHtml(t) : marked.parse(t);
+  const btn = document.getElementById(`toggle-${m}`);
+  if (btn) btn.textContent = 'Show full response ↓';
+}
+
+function toggleResp(m) {
+  const el = document.getElementById(`resp-${m}`);
+  const btn = document.getElementById(`toggle-${m}`);
+  const isCollapsed = el.classList.toggle('collapsed');
+  btn.textContent = isCollapsed ? 'Show full response ↓' : 'Collapse ↑';
 }
 
 function showDots(m) {
