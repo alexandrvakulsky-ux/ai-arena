@@ -1391,7 +1391,7 @@ function openViewer(index) {
   document.getElementById('hvMeta').textContent = fmtDate(entry.timestamp) + ' · ' + new Date(entry.timestamp).toLocaleTimeString();
   document.getElementById('hvQuestion').textContent = entry.question;
   document.getElementById('hv-claude').innerHTML = entry.responses?.claude ? DOMPurify.sanitize(marked.parse(entry.responses.claude)) : '(no response)';
-  document.getElementById('hv-openai').innerHTML = entry.responses?.openai ? DOMPurify.sanitize(marked.parse(entry.responses.openai) : '(no response)';
+  document.getElementById('hv-openai').innerHTML = entry.responses?.openai ? DOMPurify.sanitize(marked.parse(entry.responses.openai)) : '(no response)';
   document.getElementById('hv-gemini').innerHTML = entry.responses?.gemini ? DOMPurify.sanitize(marked.parse(entry.responses.gemini) : '(no response)';
   const synEl = document.getElementById('hv-synthesis');
   synEl.innerHTML = '';
