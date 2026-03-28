@@ -1390,9 +1390,9 @@ function openViewer(index) {
   if (!entry) return;
   document.getElementById('hvMeta').textContent = fmtDate(entry.timestamp) + ' · ' + new Date(entry.timestamp).toLocaleTimeString();
   document.getElementById('hvQuestion').textContent = entry.question;
-  document.getElementById('hv-claude').innerHTML = entry.responses?.claude ? marked.parse(entry.responses.claude) : '(no response)';
-  document.getElementById('hv-openai').innerHTML = entry.responses?.openai ? marked.parse(entry.responses.openai) : '(no response)';
-  document.getElementById('hv-gemini').innerHTML = entry.responses?.gemini ? marked.parse(entry.responses.gemini) : '(no response)';
+  document.getElementById('hv-claude').innerHTML = entry.responses?.claude ? DOMPurify.sanitize(marked.parse(entry.responses.claude) : '(no response)';
+  document.getElementById('hv-openai').innerHTML = entry.responses?.openai ? DOMPurify.sanitize(marked.parse(entry.responses.openai) : '(no response)';
+  document.getElementById('hv-gemini').innerHTML = entry.responses?.gemini ? DOMPurify.sanitize(marked.parse(entry.responses.gemini) : '(no response)';
   const synEl = document.getElementById('hv-synthesis');
   synEl.innerHTML = '';
   if (entry.synthesis) renderVerdictInto(entry.synthesis, synEl);
@@ -1425,7 +1425,7 @@ function setStatus(m, t) {
 function setResp(m, t, isErr = false) {
   const el = document.getElementById(`resp-${m}`);
   el.className = 'model-response' + (isErr ? ' error-text' : ' collapsed');
-  el.innerHTML = isErr ? escHtml(t) : marked.parse(t);
+  el.innerHTML = isErr ? escHtml(t) : DOMPurify.sanitize(marked.parse(t);
   const btn = document.getElementById(`toggle-${m}`);
   if (btn) btn.textContent = 'Show full response ↓';
 }
@@ -1474,13 +1474,13 @@ function renderVerdictInto(text, container) {
   for (let i = 0; i < parts.length; i += 2) {
     if (parts[i + 1] !== undefined) sections.push({ title: parts[i].trim(), body: parts[i + 1].trim() });
   }
-  if (!sections.length) { container.innerHTML = marked.parse(text); return; }
+  if (!sections.length) { container.innerHTML = DOMPurify.sanitize(marked.parse(text); return; }
   sections.forEach(({ body }) => {
     const box = document.createElement('div');
     box.className = 'synthesis-box';
     const b = document.createElement('div');
     b.className = 'jsb';
-    b.innerHTML = marked.parse(body);
+    b.innerHTML = DOMPurify.sanitize(marked.parse(body);
     box.appendChild(b);
     container.appendChild(box);
   });
