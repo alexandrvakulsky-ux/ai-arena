@@ -6,12 +6,30 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 const APP_PASSWORD = process.env.APP_PASSWORD || null;
 
+// ── Model config ──
+const MODELS = {
+  claude:  'claude-opus-4-6',
+  openai:  'gpt-4o',
+  gemini:  'gemini-2.5-flash',
+};
+const MAX_TOKENS = 1000;
+const TIMEOUT_MS = 30000;
+
+// ── Timeout helper ──
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms)),
+  ]);
+}
+
+// ── Auth ──
 function requireAuth(req, res, next) {
   if (!APP_PASSWORD) return next();
   const token = req.headers['x-app-token'];
@@ -30,8 +48,8 @@ app.post('/api/auth', (req, res) => {
 });
 
 // ── Claude ──
-async function callClaude(prompt, maxTokens = 1000) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt, maxTokens = MAX_TOKENS) {
+  const res = await withTimeout(fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -39,11 +57,11 @@ async function callClaude(prompt, maxTokens = 1000) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: MODELS.claude,
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
-  });
+  }), TIMEOUT_MS);
   const data = await res.json();
   if (data.error) throw new Error(`Claude: ${data.error.message}`);
   return data.content[0].text;
@@ -51,18 +69,18 @@ async function callClaude(prompt, maxTokens = 1000) {
 
 // ── OpenAI ──
 async function callOpenAI(prompt) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await withTimeout(fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 1000,
+      model: MODELS.openai,
+      max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     }),
-  });
+  }), TIMEOUT_MS);
   const data = await res.json();
   if (data.error) throw new Error(`OpenAI: ${data.error.message}`);
   return data.choices[0].message.content;
@@ -70,23 +88,23 @@ async function callOpenAI(prompt) {
 
 // ── Gemini ──
 async function callGemini(prompt) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
+  const res = await withTimeout(fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1000 },
+        generationConfig: { maxOutputTokens: MAX_TOKENS },
       }),
     }
-  );
+  ), TIMEOUT_MS);
   const data = await res.json();
   if (data.error) throw new Error(`Gemini: ${data.error.message}`);
   return data.candidates[0].content.parts[0].text;
 }
 
-// ── /api/ask  — run all 3 models in parallel ──
+// ── /api/ask — run all 3 models in parallel ──
 app.post('/api/ask', requireAuth, async (req, res) => {
   const { question } = req.body;
   if (!question) return res.status(400).json({ error: 'question is required' });
@@ -98,18 +116,18 @@ app.post('/api/ask', requireAuth, async (req, res) => {
   ]);
 
   res.json({
-    claude:  claude.status  === 'fulfilled' ? claude.value  : null,
-    openai:  openai.status  === 'fulfilled' ? openai.value  : null,
-    gemini:  gemini.status  === 'fulfilled' ? gemini.value  : null,
+    claude: claude.status  === 'fulfilled' ? claude.value  : null,
+    openai: openai.status  === 'fulfilled' ? openai.value  : null,
+    gemini: gemini.status  === 'fulfilled' ? gemini.value  : null,
     errors: {
-      claude:  claude.status  === 'rejected' ? claude.reason.message  : null,
-      openai:  openai.status  === 'rejected' ? openai.reason.message  : null,
-      gemini:  gemini.status  === 'rejected' ? gemini.reason.message  : null,
+      claude: claude.status  === 'rejected' ? claude.reason.message  : null,
+      openai: openai.status  === 'rejected' ? openai.reason.message  : null,
+      gemini: gemini.status  === 'rejected' ? gemini.reason.message  : null,
     },
   });
 });
 
-// ── /api/synthesize  — Claude judges + synthesizes ──
+// ── /api/synthesize — Claude judges + synthesizes ──
 app.post('/api/synthesize', requireAuth, async (req, res) => {
   const { question, responses } = req.body;
   if (!question || !responses) return res.status(400).json({ error: 'question and responses required' });
