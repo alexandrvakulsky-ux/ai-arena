@@ -1288,6 +1288,10 @@ function init() {
   if (token) {
     fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: atob(token) }) })
       .then(r => r.json()).then(d => { if (d.ok) unlock(); });
+  } else {
+    // Auto-unlock if server has no password set
+    fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: '' }) })
+      .then(r => r.json()).then(d => { if (d.ok) unlock(); });
   }
 }
 
