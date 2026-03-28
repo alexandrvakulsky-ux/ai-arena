@@ -7,6 +7,10 @@
             "type": "command",
             "command": "git pull 2>/dev/null || true",
             "statusMessage": "Pulling latest changes..."
+          },
+          {
+            "type": "command",
+            "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server. Required: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, APP_PASSWORD\"}' || true"
           }
         ]
       }
