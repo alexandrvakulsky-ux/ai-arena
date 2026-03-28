@@ -1480,7 +1480,7 @@ function renderVerdictInto(text, container) {
     box.className = 'synthesis-box';
     const b = document.createElement('div');
     b.className = 'jsb';
-    b.innerHTML = DOMPurify.sanitize(marked.parse(body);
+    b.innerHTML = DOMPurify.sanitize(marked.parse(body));
     box.appendChild(b);
     container.appendChild(box);
   });
