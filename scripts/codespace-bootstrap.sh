@@ -8,6 +8,12 @@ cd "$ROOT"
 git pull --ff-only 2>/dev/null || true
 npm install
 
+# Install Claude Code globally if not already present
+if ! command -v claude &>/dev/null; then
+  echo "[codespace] Installing Claude Code..."
+  npm install -g @anthropic-ai/claude-code
+fi
+
 ensure_env() {
   if [[ -f .env && -s .env ]]; then
     return 0
