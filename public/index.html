@@ -1330,19 +1330,6 @@ function changePw() {
   alert('To change the password, update APP_PASSWORD in your Railway environment variables.');
 }
 
-function expandResp(model, name, color) {
-  const content = document.getElementById(`resp-${model}`).innerHTML;
-  if (!content) return;
-  document.getElementById('expandHeader').innerHTML =
-    `<div class="model-dot" style="background:${color}"></div><span class="model-name" style="color:${color}">${name}</span>`;
-  document.getElementById('expandContent').innerHTML = content;
-  document.getElementById('expandOverlay').classList.add('open');
-}
-
-function closeExpand() {
-  document.getElementById('expandOverlay').classList.remove('open');
-}
-
 // ── HISTORY ──
 function getHistory() { try { return JSON.parse(localStorage.getItem(K_HIST) || '[]'); } catch { return []; } }
 
