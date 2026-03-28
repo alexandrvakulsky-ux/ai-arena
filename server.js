@@ -72,15 +72,52 @@ function requireAuth(req, res, next) {
   res.status(401).json({ error: 'Unauthorized' });
 }
 
+// ── Lockout tracker — 5 wrong attempts → 15 min ban per IP ──
+const LOCKOUT_MAX      = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+const lockoutStore     = new Map();       // ip → { attempts, lockedUntil }
+
+function getLockout(ip) {
+  const rec = lockoutStore.get(ip);
+  if (!rec || !rec.lockedUntil) return null;
+  if (Date.now() < rec.lockedUntil) return Math.ceil((rec.lockedUntil - Date.now()) / 60000);
+  lockoutStore.delete(ip); // expired
+  return null;
+}
+
+function recordFailure(ip) {
+  const rec = lockoutStore.get(ip) || { attempts: 0, lockedUntil: null };
+  rec.attempts++;
+  if (rec.attempts >= LOCKOUT_MAX) {
+    rec.lockedUntil = Date.now() + LOCKOUT_DURATION;
+    rec.attempts    = 0;
+  }
+  lockoutStore.set(ip, rec);
+}
+
+function clearLockout(ip) { lockoutStore.delete(ip); }
+
 // ── Auth endpoints ──
 app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
   if (!APP_PASSWORD) return res.json({ ok: true, token: SESSION_TOKEN });
+
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+  const minsLeft = getLockout(ip);
+  if (minsLeft) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft === 1 ? '' : 's'}.` });
+
   const { password } = req.body;
   if (typeof password !== 'string') return res.status(400).json({ ok: false, error: 'Invalid input' });
+
   if (password === APP_PASSWORD) {
+    clearLockout(ip);
     res.json({ ok: true, token: SESSION_TOKEN });
   } else {
-    res.status(401).json({ ok: false, error: 'Wrong password' });
+    recordFailure(ip);
+    const locked = getLockout(ip);
+    if (locked) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${locked} minute${locked === 1 ? '' : 's'}.` });
+    const remaining = LOCKOUT_MAX - (lockoutStore.get(ip)?.attempts || 0);
+    res.status(401).json({ ok: false, error: `Wrong password. ${remaining} attempt${remaining === 1 ? '' : 's'} left before lockout.` });
   }
 });
 
