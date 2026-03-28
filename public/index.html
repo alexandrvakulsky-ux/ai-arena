@@ -1425,7 +1425,7 @@ function setStatus(m, t) {
 function setResp(m, t, isErr = false) {
   const el = document.getElementById(`resp-${m}`);
   el.className = 'model-response' + (isErr ? ' error-text' : ' collapsed');
-  el.innerHTML = isErr ? escHtml(t) : DOMPurify.sanitize(marked.parse(t);
+  el.innerHTML = isErr ? escHtml(t) : DOMPurify.sanitize(marked.parse(t));
   const btn = document.getElementById(`toggle-${m}`);
   if (btn) btn.textContent = 'Show full response ↓';
 }
