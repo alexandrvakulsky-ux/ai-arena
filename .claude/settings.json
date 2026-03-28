@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{const f=(JSON.parse(d).tool_input||{}).file_path||''; process.stdout.write(f)})\" | { read -r f; [ -n \"$f\" ] && git add \"$f\" && git commit -m \"Auto-save: update $(basename \\\"$f\\\")\" && git push; } 2>/dev/null || true",
+            "statusMessage": "Committing and pushing..."
+          }
+        ]
+      }
+    ]
+  }
+}
