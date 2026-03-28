@@ -124,7 +124,15 @@ app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
 app.get('/api/verify', requireAuth, (_req, res) => res.json({ ok: true }));
 
 // ── Model callers ──
-async function callClaude(prompt, maxTokens = MAX_TOKENS) {
+async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000 } = {}) {
+  const body = {
+    model: MODELS.claude,
+    // max_tokens must exceed thinkingBudget when thinking is enabled
+    max_tokens: thinking ? Math.max(maxTokens, thinkingBudget + 1000) : maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  if (thinking) body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+
   const res = await withTimeout(fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -132,15 +140,14 @@ async function callClaude(prompt, maxTokens = MAX_TOKENS) {
       'x-api-key': process.env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: MODELS.claude,
-      max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  }), TIMEOUT_MS);
+    body: JSON.stringify(body),
+  }), thinking ? 90000 : TIMEOUT_MS); // thinking needs more time
   const data = await res.json();
   if (data.error) throw new Error('Claude API error');
-  return data.content[0].text;
+  // when thinking is on, response has [{type:'thinking',...},{type:'text',...}]
+  const textBlock = data.content.find(b => b.type === 'text');
+  if (!textBlock) throw new Error('Claude API error');
+  return textBlock.text;
 }
 
 async function callOpenAI(prompt, maxTokens = MAX_TOKENS) {
