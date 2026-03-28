@@ -1474,7 +1474,7 @@ function renderVerdictInto(text, container) {
   for (let i = 0; i < parts.length; i += 2) {
     if (parts[i + 1] !== undefined) sections.push({ title: parts[i].trim(), body: parts[i + 1].trim() });
   }
-  if (!sections.length) { container.innerHTML = DOMPurify.sanitize(marked.parse(text); return; }
+  if (!sections.length) { container.innerHTML = DOMPurify.sanitize(marked.parse(text)); return; }
   sections.forEach(({ body }) => {
     const box = document.createElement('div');
     box.className = 'synthesis-box';
