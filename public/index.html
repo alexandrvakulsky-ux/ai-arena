@@ -1300,7 +1300,7 @@ async function checkPw() {
   const res = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: val }) });
   const data = await res.json();
   if (data.ok) {
-    localStorage.setItem(K_TOKEN, data.token || btoa(val));
+    setToken(data.token);
     unlock();
   } else {
     err.textContent = 'Wrong password.'; shake();
