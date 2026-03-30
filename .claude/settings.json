@@ -1,4 +1,22 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(gh auth:*)",
+      "Skill(schedule)",
+      "Skill(schedule:*)",
+      "Bash(npm --version)",
+      "Bash(npm ls:*)",
+      "Bash(claude --version)",
+      "Bash(npm start:*)",
+      "Bash(wc -l ~/.claude/projects/-workspace/*.jsonl)",
+      "Bash(du -sh ~/.claude/projects/-workspace/*.jsonl)",
+      "Bash(python3 -m json.tool)"
+    ],
+    "additionalDirectories": [
+      "/home/node/.claude",
+      "/home/node/.claude/projects/-workspace/memory"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -11,6 +29,17 @@
           {
             "type": "command",
             "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server. Required: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, APP_PASSWORD\"}' || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /workspace/scripts/save-session.js",
+            "statusMessage": "Saving session history..."
           }
         ]
       }
