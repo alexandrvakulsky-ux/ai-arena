@@ -1833,6 +1833,9 @@ async function runAll() {
 
   if (synthesis) {
     const cleanSynthesis = stripScores(synthesis).slice(0, 2000);
+    currentQuestion  = question;
+    currentSynthesis = cleanSynthesis;
+    document.getElementById('pdfBtn').hidden = false;
     conversationHistory.push({ question: question.slice(0, 500), synthesis: cleanSynthesis });
     if (conversationHistory.length > 8) conversationHistory.shift();
     addTurnToThread(question, cleanSynthesis);
