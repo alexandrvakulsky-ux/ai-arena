@@ -124,12 +124,19 @@ app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
 app.get('/api/verify', requireAuth, (_req, res) => res.json({ ok: true }));
 
 // ── Model callers ──
-async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000 } = {}) {
+async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000, history = [] } = {}) {
+  const messages = [];
+  for (const turn of history) {
+    messages.push({ role: 'user', content: turn.question });
+    messages.push({ role: 'assistant', content: turn.synthesis });
+  }
+  messages.push({ role: 'user', content: prompt });
+
   const body = {
     model: MODELS.claude,
     // max_tokens must exceed thinkingBudget when thinking is enabled
     max_tokens: thinking ? Math.max(maxTokens, thinkingBudget + 1000) : maxTokens,
-    messages: [{ role: 'user', content: prompt }],
+    messages,
   };
   if (thinking) body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
 
