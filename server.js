@@ -182,14 +182,21 @@ async function callOpenAI(prompt, maxTokens = MAX_TOKENS, { history = [] } = {})
   return data.choices[0].message.content;
 }
 
-async function callGemini(prompt, maxTokens = MAX_TOKENS) {
+async function callGemini(prompt, maxTokens = MAX_TOKENS, { history = [] } = {}) {
+  const contents = [];
+  for (const turn of history) {
+    contents.push({ role: 'user', parts: [{ text: turn.question }] });
+    contents.push({ role: 'model', parts: [{ text: turn.synthesis }] });
+  }
+  contents.push({ role: 'user', parts: [{ text: prompt }] });
+
   const res = await withTimeout(fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents,
         generationConfig: { maxOutputTokens: maxTokens },
       }),
     }
