@@ -109,6 +109,11 @@ async function main() {
 
   fs.writeFileSync(outFile, output);
 
+  // Commit and push so it's available on all devices via git pull
+  try {
+    execSync(`git -C "${REPO_DIR}" add "${outFile}" && git -C "${REPO_DIR}" commit -m "Auto-save: session ${sessionId}" && git -C "${REPO_DIR}" push`, { stdio: 'ignore' });
+  } catch {}
+
   const origSize = fs.statSync(jsonlPath).size;
   const newSize = Buffer.byteLength(output);
   console.log(
