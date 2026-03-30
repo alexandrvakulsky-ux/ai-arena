@@ -1684,7 +1684,7 @@ async function runAll() {
     const askRes = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-app-token': getToken() },
-      body: JSON.stringify({ question, history: conversationHistory }),
+      body: JSON.stringify({ question, history: conversationHistory.slice(-8) }),
     });
     const askData = await askRes.json();
     responses = { claude: askData.claude, openai: askData.openai, gemini: askData.gemini };
