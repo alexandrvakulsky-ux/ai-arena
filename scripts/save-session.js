@@ -12,10 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const SESSIONS_DIR = path.join(
-  os.homedir(),
-  '.claude/projects/-workspace/memory/sessions'
-);
+const SESSIONS_DIR = '/workspace/.claude/sessions';
+const REPO_DIR = '/workspace';
 const MAX_ASSISTANT_CHARS = 800;
 
 function extractText(content) {
