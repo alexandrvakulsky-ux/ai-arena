@@ -1631,24 +1631,24 @@ function addTurnToThread(question, synthesis) {
   userMsg.className = 'conv-user-msg';
   userMsg.textContent = question;
 
-  const cleanSyn = synthesis.replace(/^Scores:.*$/im, '').trim();
-
   const synItem = document.createElement('div');
   synItem.className = 'conv-synthesis-item';
-  synItem.innerHTML = `
-    <div class="conv-synthesis-header">
-      <span class="conv-synthesis-label">✨ Synthesis</span>
-      <span class="conv-synthesis-toggle">expand ↓</span>
-    </div>
-    <div class="conv-synthesis-body jsb"></div>`;
 
-  synItem.querySelector('.conv-synthesis-body').innerHTML = DOMPurify.sanitize(marked.parse(cleanSyn));
-  synItem.querySelector('.conv-synthesis-header').addEventListener('click', function() {
-    const body = this.nextElementSibling;
-    const tog  = this.querySelector('.conv-synthesis-toggle');
-    body.classList.toggle('open');
-    tog.textContent = body.classList.contains('open') ? 'collapse ↑' : 'expand ↓';
+  const synHeader = document.createElement('div');
+  synHeader.className = 'conv-synthesis-header';
+  synHeader.innerHTML = '<span class="conv-synthesis-label">✨ Synthesis</span><span class="conv-synthesis-toggle">expand ↓</span>';
+
+  const synBody = document.createElement('div');
+  synBody.className = 'conv-synthesis-body jsb';
+  synBody.innerHTML = DOMPurify.sanitize(marked.parse(synthesis));
+
+  synHeader.addEventListener('click', () => {
+    synBody.classList.toggle('open');
+    synHeader.querySelector('.conv-synthesis-toggle').textContent = synBody.classList.contains('open') ? 'collapse ↑' : 'expand ↓';
   });
+
+  synItem.appendChild(synHeader);
+  synItem.appendChild(synBody);
 
   turn.appendChild(userMsg);
   turn.appendChild(synItem);
