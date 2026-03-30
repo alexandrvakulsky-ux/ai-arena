@@ -1324,11 +1324,14 @@
         <p class="subtitle">ask once · three answers · one synthesis</p>
       </header>
 
+      <div class="conv-thread" id="convThread"></div>
+
       <div class="panel">
-        <span class="panel-label">Your Question</span>
+        <span class="panel-label" id="questionLabel">Your Question</span>
         <textarea id="questionInput"
           placeholder="Ask anything… All three models will answer, then Claude will analyze, compare, and synthesize the best possible response."></textarea>
         <button class="run-btn" id="runBtn" onclick="runAll()">Run all models</button>
+        <button class="new-chat-btn" id="newChatBtn" onclick="resetConversation()">+ New Chat</button>
       </div>
 
       <div class="responses-grid" id="responsesGrid" style="display:none">
