@@ -1770,6 +1770,7 @@ async function runAll() {
   grid.style.display = 'flex';
   judgePanel.classList.remove('visible');
   document.getElementById('judgeContent').innerHTML = '';
+  document.getElementById('pdfBtn').hidden = true;
   resetScores();
 
   ['claude', 'openai', 'gemini'].forEach((m) => {
