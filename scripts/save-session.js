@@ -2,7 +2,7 @@
 /**
  * Save a compact conversation summary from a Claude Code JSONL session file.
  * Strips tool calls, thinking blocks, and metadata — keeps only user/assistant text.
- * Output: ~/.claude/projects/-workspace/memory/sessions/YYYY-MM-DD-{sessionId}.md
+ * Output: /workspace/.claude/sessions/YYYY-MM-DD-{sessionId}.md (committed to git for cross-device sync)
  *
  * Called by the Stop hook in .claude/settings.json.
  * Receives JSON on stdin: { session_id, transcript_path }
