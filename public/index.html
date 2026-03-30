@@ -1384,18 +1384,14 @@
       <header>
         <div class="logo">Multi-Model Intelligence</div>
         <h1>AI Arena</h1>
-        <p class="subtitle">ask once · three answers · one synthesis</p>
       </header>
 
-      <div class="conv-thread" id="convThread"></div>
-
-      <div class="panel">
-        <span class="panel-label" id="questionLabel">Your Question</span>
-        <textarea id="questionInput"
-          placeholder="Ask anything… All three models will answer, then Claude will analyze, compare, and synthesize the best possible response."></textarea>
-        <button class="run-btn" id="runBtn" onclick="runAll()">Run all models</button>
-        <button class="new-chat-btn" id="newChatBtn" onclick="resetConversation()">+ New Chat</button>
+      <div id="emptyState" class="empty-state">
+        <p class="empty-headline">Three models. One synthesis.</p>
+        <p class="empty-sub">Ask anything below — Claude, ChatGPT, and Gemini answer in parallel, then the best response is synthesized.</p>
       </div>
+
+      <div class="conv-thread" id="convThread"></div>
 
       <div class="responses-grid" id="responsesGrid" style="display:none">
         <div class="model-card" id="card-claude">
