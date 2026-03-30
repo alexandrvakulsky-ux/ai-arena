@@ -1544,6 +1544,10 @@ function showDots(m) {
 }
 
 // ── SCORE PARSER ──
+function stripScores(text) {
+  return text.replace(/^Scores:.*$/im, '').trim();
+}
+
 function applyScores(text) {
   const m = text.match(/^Scores:\s*Claude=(\d+)\/10,\s*ChatGPT=(\d+)\/10,\s*Gemini=(\d+)\/10/im);
   if (!m) return text;
@@ -1554,7 +1558,7 @@ function applyScores(text) {
     el.style.color = color;
     el.hidden = false;
   });
-  return text.replace(/^Scores:.*$/im, '').trim();
+  return stripScores(text);
 }
 
 function resetScores() {
