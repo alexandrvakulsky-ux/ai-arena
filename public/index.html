@@ -1571,8 +1571,7 @@ function resetScores() {
 // ── VERDICT RENDERER ──
 function renderVerdictInto(text, container) {
   container.innerHTML = '';
-  // Strip scores line (handled separately on main view; strip silently for history)
-  text = text.replace(/^Scores:.*$/im, '').trim();
+  text = stripScores(text);
   const rx = /##\s*(✨ Synthesized Answer)/g;
   const parts = text.split(rx).filter(s => s.trim());
   const sections = [];
