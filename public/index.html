@@ -1592,6 +1592,67 @@ function renderVerdict(text) {
   renderVerdictInto(cleaned, document.getElementById('judgeContent'));
 }
 
+// ── CONVERSATION HISTORY ──
+let conversationHistory = []; // { question, synthesis } — current session only
+
+function resetConversation() {
+  conversationHistory = [];
+  const thread = document.getElementById('convThread');
+  thread.innerHTML = '';
+  thread.style.display = 'none';
+  document.getElementById('newChatBtn').style.display = 'none';
+  document.getElementById('questionLabel').textContent = 'Your Question';
+  document.getElementById('questionInput').placeholder = 'Ask anything… All three models will answer, then Claude will analyze, compare, and synthesize the best possible response.';
+  document.getElementById('responsesGrid').style.display = 'none';
+  document.getElementById('judgePanel').classList.remove('visible');
+  document.getElementById('judgeContent').innerHTML = '';
+  document.getElementById('questionInput').value = '';
+  resetScores();
+  ['claude', 'openai', 'gemini'].forEach(m => {
+    setStatus(m, 'waiting');
+    document.getElementById(`resp-${m}`).innerHTML = '';
+  });
+}
+
+function addTurnToThread(question, synthesis) {
+  const thread = document.getElementById('convThread');
+  thread.style.display = 'flex';
+  document.getElementById('newChatBtn').style.display = 'inline-flex';
+  document.getElementById('questionLabel').textContent = 'Follow-up';
+  document.getElementById('questionInput').placeholder = 'Ask a follow-up question…';
+
+  const turn = document.createElement('div');
+  turn.className = 'conv-turn';
+
+  const userMsg = document.createElement('div');
+  userMsg.className = 'conv-user-msg';
+  userMsg.textContent = question;
+
+  const cleanSyn = synthesis.replace(/^Scores:.*$/im, '').trim();
+
+  const synItem = document.createElement('div');
+  synItem.className = 'conv-synthesis-item';
+  synItem.innerHTML = `
+    <div class="conv-synthesis-header">
+      <span class="conv-synthesis-label">✨ Synthesis</span>
+      <span class="conv-synthesis-toggle">expand ↓</span>
+    </div>
+    <div class="conv-synthesis-body jsb"></div>`;
+
+  synItem.querySelector('.conv-synthesis-body').innerHTML = DOMPurify.sanitize(marked.parse(cleanSyn));
+  synItem.querySelector('.conv-synthesis-header').addEventListener('click', function() {
+    const body = this.nextElementSibling;
+    const tog  = this.querySelector('.conv-synthesis-toggle');
+    body.classList.toggle('open');
+    tog.textContent = body.classList.contains('open') ? 'collapse ↑' : 'expand ↓';
+  });
+
+  turn.appendChild(userMsg);
+  turn.appendChild(synItem);
+  thread.appendChild(turn);
+  thread.scrollTop = thread.scrollHeight;
+}
+
 // ── MAIN RUN (calls backend) ──
 async function runAll() {
   const question = document.getElementById('questionInput').value.trim();
