@@ -1,6 +1,18 @@
 {
   "name": "AI Arena",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "TZ": "${localEnv:TZ:America/New_York}",
+      "CLAUDE_CODE_VERSION": "latest",
+      "GIT_DELTA_VERSION": "0.18.2",
+      "ZSH_IN_DOCKER_VERSION": "1.2.0"
+    }
+  },
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
@@ -8,13 +20,32 @@
       "onAutoForward": "notify"
     }
   },
-  "postCreateCommand": "chmod +x scripts/codespace-bootstrap.sh 2>/dev/null || true",
-  "postStartCommand": "bash scripts/codespace-bootstrap.sh",
   "customizations": {
     "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash"
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "zsh"
       }
     }
-  }
+  },
+  "remoteUser": "node",
+  "mounts": [
+    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand"
 }
