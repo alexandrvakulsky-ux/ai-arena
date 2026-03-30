@@ -162,12 +162,7 @@ async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, th
 }
 
 async function callOpenAI(prompt, maxTokens = MAX_TOKENS, { history = [] } = {}) {
-  const messages = [];
-  for (const turn of history) {
-    messages.push({ role: 'user', content: turn.question });
-    messages.push({ role: 'assistant', content: turn.synthesis });
-  }
-  messages.push({ role: 'user', content: prompt });
+  const messages = buildMessages(history, prompt);
 
   const res = await withTimeout(fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
