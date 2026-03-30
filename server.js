@@ -157,7 +157,14 @@ async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, th
   return textBlock.text;
 }
 
-async function callOpenAI(prompt, maxTokens = MAX_TOKENS) {
+async function callOpenAI(prompt, maxTokens = MAX_TOKENS, { history = [] } = {}) {
+  const messages = [];
+  for (const turn of history) {
+    messages.push({ role: 'user', content: turn.question });
+    messages.push({ role: 'assistant', content: turn.synthesis });
+  }
+  messages.push({ role: 'user', content: prompt });
+
   const res = await withTimeout(fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -167,7 +174,7 @@ async function callOpenAI(prompt, maxTokens = MAX_TOKENS) {
     body: JSON.stringify({
       model: MODELS.openai,
       max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
     }),
   }), TIMEOUT_MS);
   const data = await res.json();
