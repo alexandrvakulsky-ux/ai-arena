@@ -1692,6 +1692,71 @@ function addTurnToThread(question, synthesis) {
   thread.scrollTop = thread.scrollHeight;
 }
 
+// ── PDF EXPORT ──
+let currentQuestion  = '';
+let currentSynthesis = '';
+
+async function savePDF() {
+  const btn = document.getElementById('pdfBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  // Collect score badges from the live UI
+  const scoreBadges = [
+    { id: 'claude', label: 'Claude',  color: '#7c3aed' },
+    { id: 'openai', label: 'ChatGPT', color: '#059669' },
+    { id: 'gemini', label: 'Gemini',  color: '#0284c7' },
+  ].map(({ id, label, color }) => {
+    const el = document.getElementById(`score-${id}`);
+    if (!el || el.hidden) return '';
+    return `<span style="background:${color}18;border:1px solid ${color}44;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:${color};white-space:nowrap">${label} ${el.textContent}</span>`;
+  }).join('');
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:40px 44px;background:#fff;color:#111827;width:720px';
+  wrapper.innerHTML = `
+    <style>
+      .pb p{margin:0 0 .85em}
+      .pb h1,.pb h2,.pb h3{font-weight:600;color:#111827;margin:1.2em 0 .45em;line-height:1.3}
+      .pb h1{font-size:17px}.pb h2{font-size:15px}.pb h3{font-size:14px;color:#374151}
+      .pb h1:first-child,.pb h2:first-child{margin-top:0}
+      .pb ul,.pb ol{padding-left:1.4em;margin:.35em 0 .75em}
+      .pb li{margin-bottom:.3em;line-height:1.6}
+      .pb table{width:100%;border-collapse:collapse;font-size:13px;margin:.75em 0}
+      .pb th{background:#f9fafb;font-weight:600;padding:8px 12px;border:1px solid #e5e7eb;text-align:left}
+      .pb td{padding:8px 12px;border:1px solid #e5e7eb;color:#374151}
+      .pb code{font-family:monospace;font-size:12px;background:#f3f4f6;padding:2px 5px;border-radius:3px}
+      .pb pre{background:#f3f4f6;padding:12px;border-radius:6px;margin:.6em 0;font-size:12px;line-height:1.5}
+      .pb pre code{background:none;padding:0}
+      .pb strong{font-weight:600}
+      .pb blockquote{border-left:3px solid #e5e7eb;margin:.75em 0;padding:.4em 0 .4em 1em;color:#6b7280}
+      .pb hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
+    </style>
+    <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">AI Arena · ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
+    <h1 style="font-size:19px;font-weight:600;color:#111827;margin:0 0 14px;line-height:1.4">${escHtml(currentQuestion)}</h1>
+    ${scoreBadges ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">${scoreBadges}</div>` : ''}
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 20px">
+    <div class="pb">${DOMPurify.sanitize(marked.parse(currentSynthesis))}</div>`;
+
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '-9999px';
+  document.body.appendChild(wrapper);
+
+  const slug = currentQuestion.slice(0, 40).replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-|-$/g, '');
+  try {
+    await html2pdf().set({
+      margin: [14, 14, 14, 14],
+      filename: `ai-arena-${slug || 'synthesis'}.pdf`,
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    }).from(wrapper).save();
+  } finally {
+    document.body.removeChild(wrapper);
+    btn.disabled = false;
+    btn.textContent = '↓ Save PDF';
+  }
+}
+
 // ── MAIN RUN (calls backend) ──
 async function runAll() {
   const question = document.getElementById('questionInput').value.trim();
