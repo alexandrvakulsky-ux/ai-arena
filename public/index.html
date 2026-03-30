@@ -1636,6 +1636,9 @@ let conversationHistory = []; // { question, synthesis } — current session onl
 
 function resetConversation() {
   conversationHistory = [];
+  currentQuestion  = '';
+  currentSynthesis = '';
+  document.getElementById('pdfBtn').hidden = true;
   const thread = document.getElementById('convThread');
   thread.innerHTML = '';
   thread.style.display = 'none';
