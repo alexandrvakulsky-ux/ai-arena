@@ -124,13 +124,17 @@ app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
 app.get('/api/verify', requireAuth, (_req, res) => res.json({ ok: true }));
 
 // ── Model callers ──
-async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000, history = [] } = {}) {
-  const messages = [];
-  for (const turn of history) {
-    messages.push({ role: 'user', content: turn.question });
-    messages.push({ role: 'assistant', content: turn.synthesis });
-  }
+function buildMessages(history, prompt) {
+  const messages = history.flatMap(t => [
+    { role: 'user',      content: t.question  },
+    { role: 'assistant', content: t.synthesis },
+  ]);
   messages.push({ role: 'user', content: prompt });
+  return messages;
+}
+
+async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000, history = [] } = {}) {
+  const messages = buildMessages(history, prompt);
 
   const body = {
     model: MODELS.claude,
