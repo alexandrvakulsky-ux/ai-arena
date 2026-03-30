@@ -208,14 +208,27 @@ async function callGemini(prompt, maxTokens = MAX_TOKENS, { history = [] } = {})
 
 // ── /api/ask — round 1: all 3 models answer in parallel ──
 app.post('/api/ask', requireAuth, rateLimit(60_000, 20), async (req, res) => {
-  const { question } = req.body;
+  const { question, history: rawHistory } = req.body;
   if (!question || typeof question !== 'string') return res.status(400).json({ error: 'question is required' });
   if (question.length > MAX_QUESTION_LEN) return res.status(400).json({ error: `question must be under ${MAX_QUESTION_LEN} characters` });
 
+  // Validate and sanitize history — max 8 turns, bounded lengths per entry
+  const history = [];
+  if (Array.isArray(rawHistory)) {
+    for (const turn of rawHistory.slice(0, 8)) {
+      if (turn && typeof turn.question === 'string' && typeof turn.synthesis === 'string') {
+        history.push({
+          question:  turn.question.slice(0, 500),
+          synthesis: turn.synthesis.slice(0, 2000),
+        });
+      }
+    }
+  }
+
   const [claude, openai, gemini] = await Promise.allSettled([
-    callClaude(question),
-    process.env.OPENAI_API_KEY ? callOpenAI(question) : Promise.reject(new Error('No OpenAI key configured')),
-    process.env.GOOGLE_API_KEY ? callGemini(question) : Promise.reject(new Error('No Gemini key configured')),
+    callClaude(question, MAX_TOKENS, { history }),
+    process.env.OPENAI_API_KEY ? callOpenAI(question, MAX_TOKENS, { history }) : Promise.reject(new Error('No OpenAI key configured')),
+    process.env.GOOGLE_API_KEY ? callGemini(question, MAX_TOKENS, { history }) : Promise.reject(new Error('No Gemini key configured')),
   ]);
 
   res.json({
