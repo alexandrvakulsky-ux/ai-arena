@@ -10,7 +10,11 @@
       "Bash(npm start:*)",
       "Bash(wc -l ~/.claude/projects/-workspace/*.jsonl)",
       "Bash(du -sh ~/.claude/projects/-workspace/*.jsonl)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(crontab -l)",
+      "Bash(apt list:*)",
+      "Read(//etc/**)",
+      "Bash(apt-get install:*)"
     ],
     "additionalDirectories": [
       "/home/node/.claude",
@@ -29,6 +33,11 @@
           {
             "type": "command",
             "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server. Required: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, APP_PASSWORD\"}' || true"
+          },
+          {
+            "type": "command",
+            "command": "nohup bash /workspace/scripts/save-session-loop.sh > /dev/null 2>&1 & disown",
+            "statusMessage": "Starting session auto-save (every 15 min)..."
           }
         ]
       }
