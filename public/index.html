@@ -1726,6 +1726,17 @@ async function runAll() {
 
   document.getElementById('runBtn').disabled = false;
   pushHistory({ question, responses, synthesis, timestamp: Date.now() });
+
+  if (synthesis) {
+    // Store turn for conversation context (truncated to keep payload bounded)
+    conversationHistory.push({
+      question:  question.slice(0, 500),
+      synthesis: synthesis.replace(/^Scores:.*$/im, '').trim().slice(0, 2000),
+    });
+    addTurnToThread(question, synthesis);
+    document.getElementById('questionInput').value = '';
+    document.getElementById('questionInput').focus();
+  }
 }
 
 init();
