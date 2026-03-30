@@ -1731,12 +1731,10 @@ async function runAll() {
   pushHistory({ question, responses, synthesis, timestamp: Date.now() });
 
   if (synthesis) {
-    // Store turn for conversation context (truncated to keep payload bounded)
-    conversationHistory.push({
-      question:  question.slice(0, 500),
-      synthesis: synthesis.replace(/^Scores:.*$/im, '').trim().slice(0, 2000),
-    });
-    addTurnToThread(question, synthesis);
+    const cleanSynthesis = stripScores(synthesis).slice(0, 2000);
+    conversationHistory.push({ question: question.slice(0, 500), synthesis: cleanSynthesis });
+    if (conversationHistory.length > 8) conversationHistory.shift();
+    addTurnToThread(question, cleanSynthesis);
     document.getElementById('questionInput').value = '';
     document.getElementById('questionInput').focus();
   }
