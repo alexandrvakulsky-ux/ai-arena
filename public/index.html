@@ -410,6 +410,36 @@
     border-radius: var(--radius-lg);
     padding: 18px 18px 16px;
     margin-bottom: 0;
+    position: sticky;
+    bottom: 20px;
+    z-index: 20;
+    box-shadow: 0 -24px 48px rgba(12, 13, 16, 0.92);
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 20px 40px;
+    min-height: 220px;
+  }
+
+  .empty-headline {
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.025em;
+    margin-bottom: 10px;
+  }
+
+  .empty-sub {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 460px;
+    line-height: 1.65;
   }
 
   .panel-label {
