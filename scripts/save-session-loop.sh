@@ -11,7 +11,6 @@ if [ -f "$LOCKFILE" ]; then
 fi
 echo $$ > "$LOCKFILE"
 
-while true; do
-  sleep 900
+while sleep 900; do
   node /workspace/scripts/save-session.js >> /tmp/session-saves.log 2>&1
 done
