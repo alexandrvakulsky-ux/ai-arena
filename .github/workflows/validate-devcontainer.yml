@@ -1,0 +1,70 @@
+name: Validate devcontainer
+
+on:
+  push:
+    paths:
+      - '.devcontainer/**'
+  pull_request:
+    paths:
+      - '.devcontainer/**'
+
+jobs:
+  validate:
+    name: Validate devcontainer.json
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run validation
+        id: validate
+        run: |
+          chmod +x scripts/validate-devcontainer.sh
+          bash scripts/validate-devcontainer.sh .devcontainer/devcontainer.json
+        continue-on-error: true
+
+      - name: Auto-revert devcontainer on validation failure
+        if: steps.validate.outcome == 'failure' && github.event_name == 'push'
+        run: |
+          echo "Validation failed — auto-reverting .devcontainer/ to last known good state"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Find the last commit that passed validation (walk back until we find one)
+          GOOD_SHA=""
+          for SHA in $(git log --format="%H" HEAD~1..HEAD~20); do
+            git show "$SHA:.devcontainer/devcontainer.json" > /tmp/devcontainer-check.json 2>/dev/null || continue
+            if bash scripts/validate-devcontainer.sh /tmp/devcontainer-check.json 2>/dev/null; then
+              GOOD_SHA="$SHA"
+              break
+            fi
+          done
+
+          if [ -z "$GOOD_SHA" ]; then
+            echo "Could not find a known-good devcontainer commit in recent history."
+            echo "Manual fix required."
+            exit 1
+          fi
+
+          echo "Reverting .devcontainer/ to $GOOD_SHA"
+          git checkout "$GOOD_SHA" -- .devcontainer/
+          git add .devcontainer/
+          git commit -m "revert: auto-revert .devcontainer/ — validation failed on $(git rev-parse --short HEAD~1)
+
+Validation errors caused container startup to fail. Reverted to last known good state ($GOOD_SHA).
+Fix the devcontainer config and push again.
+
+[skip ci]"
+          git push
+
+      - name: Fail the job if validation failed (no auto-revert on PRs)
+        if: steps.validate.outcome == 'failure'
+        run: |
+          echo "devcontainer.json validation failed. See errors above."
+          exit 1
