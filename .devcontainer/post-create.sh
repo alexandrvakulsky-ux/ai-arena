@@ -38,13 +38,44 @@ if [ ! -d "$HOME/.claude/.git" ]; then
         || echo "Note: claude-sync skipped (SSH key not set up). Run manually later:"$'\n'"  git clone git@github.com:alexandrvakulsky-ux/claude-sync.git ~/.claude"
 fi
 
-# Load API keys into shell so Claude Code CLI picks them up automatically
+# Load app API keys into shell — but unset ANTHROPIC_API_KEY so Claude CLI
+# continues to use OAuth (.credentials.json) instead of falling back to API-key mode.
+# server.js loads ANTHROPIC_API_KEY via dotenv directly from .env, so it never
+# needs it in the shell environment.
 if ! grep -q 'workspace/.env' "$HOME/.zshrc" 2>/dev/null; then
-    echo '[ -f /workspace/.env ] && set -a && . /workspace/.env && set +a' >> "$HOME/.zshrc"
+    echo '[ -f /workspace/.env ] && set -a && . /workspace/.env && set +a && unset ANTHROPIC_API_KEY' >> "$HOME/.zshrc"
 fi
 
 echo ""
-echo "Ready:"
-echo "  npm start     — run the app (port 3000)"
-echo "  claude        — Claude Code CLI"
+echo "================================================"
+echo " Setup status"
+echo "================================================"
+
+# Check each required .env key for placeholder or missing values
+MISSING=0
+for key in ANTHROPIC_API_KEY OPENAI_API_KEY GOOGLE_API_KEY APP_PASSWORD; do
+    val=$(grep "^${key}=" .env 2>/dev/null | cut -d= -f2- || true)
+    if [ -z "$val" ] || echo "$val" | grep -qi 'your\|-here\|placeholder\|example'; then
+        echo "  [!] .env: $key — needs a real value"
+        MISSING=$((MISSING + 1))
+    fi
+done
+if [ "$MISSING" -eq 0 ]; then
+    echo "  [ok] .env — all keys set"
+else
+    echo "      -> Edit /workspace/.env"
+fi
+
+# Check Claude Code credentials
+if [ -f "$HOME/.claude/.credentials.json" ]; then
+    echo "  [ok] Claude Code — authenticated"
+else
+    echo "  [!] Claude Code — not logged in"
+    echo "      -> Run: claude auth login"
+fi
+
+echo "================================================"
+echo ""
+echo "  npm start  — run the app on port 3000"
+echo "  claude     — Claude Code CLI"
 echo ""
