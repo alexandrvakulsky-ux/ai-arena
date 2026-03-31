@@ -1647,11 +1647,11 @@ function setResp(m, t, isErr = false) {
   if (btn) btn.textContent = 'Show full response ↓';
 }
 
-function toggleResp(m) {
-  const el = document.getElementById(`resp-${m}`);
-  const btn = document.getElementById(`toggle-${m}`);
+function toggleResp(m, btn) {
+  const el = document.getElementById(btn ? m : `resp-${m}`);
+  const resolvedBtn = btn || document.getElementById(`toggle-${m}`);
   const isCollapsed = el.classList.toggle('collapsed');
-  btn.textContent = isCollapsed ? 'Show full response ↓' : 'Collapse ↑';
+  resolvedBtn.textContent = isCollapsed ? 'Show full response ↓' : 'Collapse ↑';
 }
 
 function showDots(m) {
