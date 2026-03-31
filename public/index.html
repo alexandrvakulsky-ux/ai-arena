@@ -1536,18 +1536,42 @@ function escHtml(s) {
 }
 
 // ── HISTORY VIEWER ──
-function openViewer(index) {
-  const entry = getHistory()[index];
-  if (!entry) return;
-  document.getElementById('hvMeta').textContent = fmtDate(entry.timestamp) + ' · ' + new Date(entry.timestamp).toLocaleTimeString();
-  document.getElementById('hvQuestion').textContent = entry.question;
-  document.getElementById('hv-claude').innerHTML = entry.responses?.claude ? DOMPurify.sanitize(marked.parse(entry.responses.claude)) : '(no response)';
-  document.getElementById('hv-openai').innerHTML = entry.responses?.openai ? DOMPurify.sanitize(marked.parse(entry.responses.openai)) : '(no response)';
-  document.getElementById('hv-gemini').innerHTML = entry.responses?.gemini ? DOMPurify.sanitize(marked.parse(entry.responses.gemini)) : '(no response)';
+function openViewer(index, sessionId) {
+  const h = getHistory();
+  viewerSessionId = sessionId || null;
+  // All turns for this conversation, oldest-first for display
+  const turns = sessionId ? h.filter(e => e.sessionId === sessionId).reverse() : [h[index]];
+  const lastTurn = turns[turns.length - 1];
+  if (!lastTurn) return;
+
+  // Meta line
+  const first = turns[0];
+  document.getElementById('hvMeta').textContent =
+    (turns.length > 1 ? `${turns.length}-turn conversation · ` : '') +
+    fmtDate(first.timestamp) + ' · ' + new Date(first.timestamp).toLocaleTimeString();
+
+  // Prior-turns summary (all except the last)
+  const summaryEl = document.getElementById('hv-thread-summary');
+  summaryEl.innerHTML = '';
+  turns.slice(0, -1).forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'hv-prior-turn';
+    const snip = t.synthesis ? escHtml(stripScores(t.synthesis).replace(/#+\s*/g, '').slice(0, 130)) + '…' : '';
+    div.innerHTML = `<div class="hv-prior-q">${escHtml(t.question)}</div>${snip ? `<div class="hv-prior-s">${snip}</div>` : ''}`;
+    summaryEl.appendChild(div);
+  });
+
+  // Latest turn
+  document.getElementById('hvQuestion').textContent =
+    (turns.length > 1 ? `Turn ${turns.length}: ` : '') + lastTurn.question;
+  document.getElementById('hv-claude').innerHTML = lastTurn.responses?.claude ? DOMPurify.sanitize(marked.parse(lastTurn.responses.claude)) : '(no response)';
+  document.getElementById('hv-openai').innerHTML = lastTurn.responses?.openai ? DOMPurify.sanitize(marked.parse(lastTurn.responses.openai)) : '(no response)';
+  document.getElementById('hv-gemini').innerHTML = lastTurn.responses?.gemini ? DOMPurify.sanitize(marked.parse(lastTurn.responses.gemini)) : '(no response)';
   const synEl = document.getElementById('hv-synthesis');
   synEl.innerHTML = '';
-  if (entry.synthesis) renderVerdictInto(entry.synthesis, synEl);
+  if (lastTurn.synthesis) renderVerdictInto(lastTurn.synthesis, synEl);
   else synEl.textContent = '(no synthesis saved)';
+
   document.getElementById('historyViewer').classList.add('open');
   document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === index));
 }
@@ -1555,6 +1579,24 @@ function openViewer(index) {
 function closeViewer() {
   document.getElementById('historyViewer').classList.remove('open');
   document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+}
+
+function continueConversation() {
+  if (!viewerSessionId) return;
+  const turns = getHistory().filter(e => e.sessionId === viewerSessionId).reverse(); // oldest-first
+  closeViewer();
+  resetConversation();
+  activeSessionId = viewerSessionId; // new questions join the same conversation
+  turns.forEach(t => {
+    const clean = t.synthesis ? stripScores(t.synthesis).slice(0, 2000) : '';
+    conversationHistory.push({ question: t.question.slice(0, 500), synthesis: clean });
+    addTurnToThread(t.question, clean || '(no synthesis)');
+  });
+  if (conversationHistory.length > 8) conversationHistory.splice(0, conversationHistory.length - 8);
+  currentQuestion  = turns[turns.length - 1]?.question || '';
+  currentSynthesis = turns[turns.length - 1]?.synthesis ? stripScores(turns[turns.length - 1].synthesis).slice(0, 2000) : '';
+  document.getElementById('pdfBtn').hidden = false;
+  document.getElementById('questionInput').focus();
 }
 
 document.getElementById('historyViewer').addEventListener('click', function(e) {
