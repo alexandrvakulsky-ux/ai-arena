@@ -43,6 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxrandr2 \
   libgbm1 \
   libasound2 \
+  libatspi2.0-0 \
+  # Voice / PulseAudio (for Claude Code voice input via WSLg)
+  libpulse0 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure default node user has access to /usr/local/share
