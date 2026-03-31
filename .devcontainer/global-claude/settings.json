@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(chmod:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(pkill:*)",
+      "Bash(nohup:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/node/.claude/scripts/skill-reminder.js 2>/dev/null || true",
+            "statusMessage": "Checking skill triggers..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/node/.claude/scripts/skill-reflection.js 2>/dev/null || true",
+            "statusMessage": "Skill reflection..."
+          },
+          {
+            "type": "command",
+            "command": "printf '\\a'",
+            "statusMessage": "Done."
+          }
+        ]
+      }
+    ]
+  }
+}
