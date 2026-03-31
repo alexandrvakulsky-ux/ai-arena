@@ -1706,8 +1706,9 @@ function renderVerdict(text) {
 
 // ── CONVERSATION HISTORY ──
 let conversationHistory = []; // { question, synthesis } — current session only
-let activeSessionId  = null; // groups all turns of one chat into a conversation
-let viewerSessionId  = null; // sessionId currently open in the history viewer
+let activeSessionId = null;
+let viewerSessionId = null;
+let viewerTurns     = null; // turns (oldest-first) cached from last openViewer call
 
 function resetConversation() {
   conversationHistory = [];
