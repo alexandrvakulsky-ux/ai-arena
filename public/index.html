@@ -1470,7 +1470,7 @@ function resetConversation() {
   });
 }
 
-function addTurnToThread(question, synthesis) {
+function addTurnToThread(question, synthesis, expanded = false) {
   const thread = document.getElementById('convThread');
   thread.style.display = 'flex';
   document.getElementById('newChatBtn').style.display = 'inline-flex';
