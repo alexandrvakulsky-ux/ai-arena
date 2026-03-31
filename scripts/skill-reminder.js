@@ -4,7 +4,8 @@
 let data = '';
 process.stdin.on('data', chunk => data += chunk);
 process.stdin.on('end', () => {
-  const filePath = (JSON.parse(data).tool_input || {}).file_path || '';
+  let filePath = '';
+  try { filePath = (JSON.parse(data).tool_input || {}).file_path || ''; } catch (_) { process.exit(0); }
   let message = null;
 
   if (filePath.includes('public/') || filePath.endsWith('.html') || filePath.endsWith('.css')) {
