@@ -13,7 +13,6 @@ app.use((req, res, next) => {
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  // HSTS: tell browsers to always use HTTPS (Railway enforces HTTPS; ignored on localhost)
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader(
     'Content-Security-Policy',
@@ -32,28 +31,148 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT         = process.env.PORT || 3000;
 const APP_PASSWORD = process.env.APP_PASSWORD || null;
-
-// Random session token — generated fresh on each server start, never contains the password.
-// Invalidates automatically on redeploy, so stolen tokens expire with each release.
 const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
+const MAX_QUESTION_LEN = 2000;
 
-// ── Startup: warn about missing keys so failures are obvious immediately ──
-if (!process.env.ANTHROPIC_API_KEY) console.warn('⚠️  ANTHROPIC_API_KEY not set — Claude calls will fail');
-if (!process.env.OPENAI_API_KEY)    console.warn('⚠️  OPENAI_API_KEY not set — ChatGPT disabled');
-if (!process.env.GOOGLE_API_KEY)    console.warn('⚠️  GOOGLE_API_KEY not set — Gemini disabled');
-if (!process.env.APP_PASSWORD)      console.warn('⚠️  APP_PASSWORD not set — app has no password gate (open to anyone with the URL)');
+['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'APP_PASSWORD'].forEach(k => {
+  if (!process.env[k]) console.warn(`⚠️  ${k} not set`);
+});
 
-// ── Model config ──
-const MODELS = {
-  claude: 'claude-opus-4-6',
-  openai: 'gpt-4o',
-  gemini: 'gemini-2.5-flash',
+// ── Provider registry ──
+// Each provider knows how to build a request, parse the response, and report errors.
+// Adding a new model = add an entry here; no other code changes needed.
+const PROVIDERS = {
+  claude: {
+    model:      'claude-opus-4-6',
+    envKey:     'ANTHROPIC_API_KEY',
+    maxTokens:  2000,
+    timeoutMs:  45000,
+    thinkingTimeoutMs: 90000,
+    async call(prompt, messages, { maxTokens, thinking, thinkingBudget, signal } = {}) {
+      const tokens = maxTokens ?? this.maxTokens;
+      const body = {
+        model: this.model,
+        max_tokens: thinking ? Math.max(tokens, thinkingBudget + 1000) : tokens,
+        messages,
+      };
+      if (thinking) body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+
+      const res = await fetchJSON('https://api.anthropic.com/v1/messages', {
+        headers: {
+          'x-api-key': process.env[this.envKey],
+          'anthropic-version': '2023-06-01',
+        },
+        body,
+        timeoutMs: thinking ? this.thinkingTimeoutMs : this.timeoutMs,
+        signal,
+      });
+      if (res.error) throw new Error(res.error.message || 'Claude API error');
+      const textBlock = res.content?.find(b => b.type === 'text');
+      if (!textBlock) throw new Error('Claude returned no text block');
+      return textBlock.text;
+    },
+  },
+
+  openai: {
+    model:     'gpt-4o',
+    envKey:    'OPENAI_API_KEY',
+    maxTokens: 2000,
+    timeoutMs: 45000,
+    async call(prompt, messages, { maxTokens, signal } = {}) {
+      const res = await fetchJSON('https://api.openai.com/v1/chat/completions', {
+        headers: { Authorization: `Bearer ${process.env[this.envKey]}` },
+        body: {
+          model: this.model,
+          max_tokens: maxTokens ?? this.maxTokens,
+          messages,
+        },
+        timeoutMs: this.timeoutMs,
+        signal,
+      });
+      if (res.error) throw new Error(res.error.message || 'OpenAI API error');
+      return res.choices[0].message.content;
+    },
+  },
+
+  gemini: {
+    model:     'gemini-2.5-flash',
+    envKey:    'GOOGLE_API_KEY',
+    maxTokens: 2000,
+    timeoutMs: 60000,
+    async call(prompt, messages, { maxTokens, signal } = {}) {
+      const contents = messages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : m.role,
+        parts: [{ text: m.content }],
+      }));
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${process.env[this.envKey]}`;
+      const res = await fetchJSON(url, {
+        body: { contents, generationConfig: { maxOutputTokens: maxTokens ?? this.maxTokens } },
+        timeoutMs: this.timeoutMs,
+        signal,
+      });
+      if (res.error) throw new Error(res.error.message || 'Gemini API error');
+      const candidate = res.candidates?.[0];
+      if (!candidate) throw new Error('Gemini returned no candidates');
+      const text = candidate.content?.parts?.[0]?.text || '';
+      if (candidate.finishReason === 'MAX_TOKENS') return text + '\n\n*[Response truncated — hit token limit]*';
+      if (candidate.finishReason === 'SAFETY')     throw new Error('Gemini blocked the response (safety filter)');
+      return text;
+    },
+  },
 };
-const MAX_TOKENS        = 1000;
-const TIMEOUT_MS        = 30000;
-const MAX_QUESTION_LEN  = 2000;
 
-// ── In-memory rate limiter (no extra package needed) ──
+const MODEL_NAMES = Object.keys(PROVIDERS);
+
+// ── Shared helpers ──
+
+async function fetchJSON(url, { headers = {}, body, timeoutMs = 45000, signal } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    return await res.json();
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Request timed out');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function sanitizeHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 8).reduce((acc, t) => {
+    if (t && typeof t.question === 'string' && typeof t.synthesis === 'string') {
+      acc.push({ question: t.question.slice(0, 500), synthesis: t.synthesis.slice(0, 2000) });
+    }
+    return acc;
+  }, []);
+}
+
+function buildMessages(history, prompt) {
+  const messages = history.flatMap(t => [
+    { role: 'user',      content: t.question },
+    { role: 'assistant', content: t.synthesis },
+  ]);
+  messages.push({ role: 'user', content: prompt });
+  return messages;
+}
+
+function callModel(name, prompt, { maxTokens, history = [], thinking = false, thinkingBudget = 8000, signal } = {}) {
+  const provider = PROVIDERS[name];
+  if (!process.env[provider.envKey]) return Promise.reject(new Error(`${provider.envKey} not configured`));
+  const messages = buildMessages(history, prompt);
+  return provider.call(prompt, messages, { maxTokens, thinking, thinkingBudget, signal });
+}
+
+// ── Rate limiter ──
 const rateLimitStore = new Map();
 function rateLimit(windowMs, max) {
   return (req, res, next) => {
@@ -68,31 +187,22 @@ function rateLimit(windowMs, max) {
   };
 }
 
-// ── Timeout helper ──
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms)),
-  ]);
-}
-
-// ── Auth middleware ──
+// ── Auth ──
 function requireAuth(req, res, next) {
   if (!APP_PASSWORD) return next();
   if (req.headers['x-app-token'] === SESSION_TOKEN) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
-// ── Lockout tracker — 5 wrong attempts → 15 min ban per IP ──
 const LOCKOUT_MAX      = 5;
-const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
-const lockoutStore     = new Map();       // ip → { attempts, lockedUntil }
+const LOCKOUT_DURATION = 15 * 60 * 1000;
+const lockoutStore     = new Map();
 
 function getLockout(ip) {
   const rec = lockoutStore.get(ip);
-  if (!rec || !rec.lockedUntil) return null;
+  if (!rec?.lockedUntil) return null;
   if (Date.now() < rec.lockedUntil) return Math.ceil((rec.lockedUntil - Date.now()) / 60000);
-  lockoutStore.delete(ip); // expired
+  lockoutStore.delete(ip);
   return null;
 }
 
@@ -101,193 +211,104 @@ function recordFailure(ip) {
   rec.attempts++;
   if (rec.attempts >= LOCKOUT_MAX) {
     rec.lockedUntil = Date.now() + LOCKOUT_DURATION;
-    rec.attempts    = 0;
+    rec.attempts = 0;
   }
   lockoutStore.set(ip, rec);
 }
 
-function clearLockout(ip) { lockoutStore.delete(ip); }
-
-// ── Auth endpoints ──
 app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
   if (!APP_PASSWORD) return res.json({ ok: true, token: SESSION_TOKEN });
-
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
-
   const minsLeft = getLockout(ip);
-  if (minsLeft) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${minsLeft} minute${minsLeft === 1 ? '' : 's'}.` });
+  if (minsLeft) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${minsLeft} min.` });
 
   const { password } = req.body;
   if (typeof password !== 'string') return res.status(400).json({ ok: false, error: 'Invalid input' });
 
   if (password === APP_PASSWORD) {
-    clearLockout(ip);
-    res.json({ ok: true, token: SESSION_TOKEN });
-  } else {
-    recordFailure(ip);
-    const locked = getLockout(ip);
-    if (locked) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${locked} minute${locked === 1 ? '' : 's'}.` });
-    const remaining = LOCKOUT_MAX - (lockoutStore.get(ip)?.attempts || 0);
-    res.status(401).json({ ok: false, error: `Wrong password. ${remaining} attempt${remaining === 1 ? '' : 's'} left before lockout.` });
+    lockoutStore.delete(ip);
+    return res.json({ ok: true, token: SESSION_TOKEN });
   }
+  recordFailure(ip);
+  const locked = getLockout(ip);
+  if (locked) return res.status(429).json({ ok: false, error: `Too many failed attempts. Try again in ${locked} min.` });
+  const remaining = LOCKOUT_MAX - (lockoutStore.get(ip)?.attempts || 0);
+  res.status(401).json({ ok: false, error: `Wrong password. ${remaining} attempt${remaining === 1 ? '' : 's'} left.` });
 });
 
 app.get('/api/verify', requireAuth, (_req, res) => res.json({ ok: true }));
 
-// ── Model callers ──
-function buildMessages(history, prompt) {
-  const messages = history.flatMap(t => [
-    { role: 'user',      content: t.question  },
-    { role: 'assistant', content: t.synthesis },
-  ]);
-  messages.push({ role: 'user', content: prompt });
-  return messages;
-}
+// Health check — no auth, used by Railway and UptimeRobot
+app.get('/health', (_req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()) }));
 
-async function callClaude(prompt, maxTokens = MAX_TOKENS, { thinking = false, thinkingBudget = 8000, history = [] } = {}) {
-  const messages = buildMessages(history, prompt);
-
-  const body = {
-    model: MODELS.claude,
-    // max_tokens must exceed thinkingBudget when thinking is enabled
-    max_tokens: thinking ? Math.max(maxTokens, thinkingBudget + 1000) : maxTokens,
-    messages,
-  };
-  if (thinking) body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
-
-  const res = await withTimeout(fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  }), thinking ? 90000 : TIMEOUT_MS); // thinking needs more time
-  const data = await res.json();
-  if (data.error) throw new Error('Claude API error');
-  // when thinking is on, response has [{type:'thinking',...},{type:'text',...}]
-  const textBlock = data.content.find(b => b.type === 'text');
-  if (!textBlock) throw new Error('Claude API error');
-  return textBlock.text;
-}
-
-async function callOpenAI(prompt, maxTokens = MAX_TOKENS, { history = [] } = {}) {
-  const messages = buildMessages(history, prompt);
-
-  const res = await withTimeout(fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODELS.openai,
-      max_tokens: maxTokens,
-      messages,
-    }),
-  }), TIMEOUT_MS);
-  const data = await res.json();
-  if (data.error) throw new Error('OpenAI API error');
-  return data.choices[0].message.content;
-}
-
-async function callGemini(prompt, maxTokens = MAX_TOKENS, { history = [] } = {}) {
-  const contents = [];
-  for (const turn of history) {
-    contents.push({ role: 'user', parts: [{ text: turn.question }] });
-    contents.push({ role: 'model', parts: [{ text: turn.synthesis }] });
-  }
-  contents.push({ role: 'user', parts: [{ text: prompt }] });
-
-  const res = await withTimeout(fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${process.env.GOOGLE_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: { maxOutputTokens: maxTokens },
-      }),
-    }
-  ), TIMEOUT_MS);
-  const data = await res.json();
-  if (data.error) throw new Error('Gemini API error');
-  return data.candidates[0].content.parts[0].text;
-}
-
-// ── /api/ask — round 1: all 3 models answer in parallel ──
+// ── /api/ask — all models answer in parallel ──
 app.post('/api/ask', requireAuth, rateLimit(60_000, 20), async (req, res) => {
-  const { question, history: rawHistory } = req.body;
+  const { question, history: rawHistory, stream } = req.body;
   if (!question || typeof question !== 'string') return res.status(400).json({ error: 'question is required' });
-  if (question.length > MAX_QUESTION_LEN) return res.status(400).json({ error: `question must be under ${MAX_QUESTION_LEN} characters` });
+  if (question.length > MAX_QUESTION_LEN)        return res.status(400).json({ error: `question must be under ${MAX_QUESTION_LEN} characters` });
 
-  // Validate and sanitize history — max 8 turns, bounded lengths per entry
-  const history = [];
-  if (Array.isArray(rawHistory)) {
-    for (const turn of rawHistory.slice(0, 8)) {
-      if (turn && typeof turn.question === 'string' && typeof turn.synthesis === 'string') {
-        history.push({
-          question:  turn.question.slice(0, 500),
-          synthesis: turn.synthesis.slice(0, 2000),
-        });
-      }
-    }
+  const history = sanitizeHistory(rawHistory);
+  const ac = new AbortController();
+  res.on('close', () => ac.abort());
+
+  const calls = Object.fromEntries(
+    MODEL_NAMES.map(name => [name, callModel(name, question, { history, signal: ac.signal })])
+  );
+
+  if (!stream) {
+    const results = await Promise.allSettled(Object.values(calls));
+    const out = {}, errors = {};
+    MODEL_NAMES.forEach((name, i) => {
+      out[name]    = results[i].status === 'fulfilled' ? results[i].value : null;
+      errors[name] = results[i].status === 'rejected'  ? results[i].reason.message : null;
+    });
+    return res.json({ ...out, errors });
   }
 
-  const [claude, openai, gemini] = await Promise.allSettled([
-    callClaude(question, MAX_TOKENS, { history }),
-    process.env.OPENAI_API_KEY ? callOpenAI(question, MAX_TOKENS, { history }) : Promise.reject(new Error('No OpenAI key configured')),
-    process.env.GOOGLE_API_KEY ? callGemini(question, MAX_TOKENS, { history }) : Promise.reject(new Error('No Gemini key configured')),
-  ]);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.flushHeaders();
 
-  res.json({
-    claude: claude.status === 'fulfilled' ? claude.value : null,
-    openai: openai.status === 'fulfilled' ? openai.value : null,
-    gemini: gemini.status === 'fulfilled' ? gemini.value : null,
-    errors: {
-      claude: claude.status === 'rejected' ? claude.reason.message : null,
-      openai: openai.status === 'rejected' ? openai.reason.message : null,
-      gemini: gemini.status === 'rejected' ? gemini.reason.message : null,
-    },
-  });
+  let finished = 0;
+  for (const [model, promise] of Object.entries(calls)) {
+    promise
+      .then(text => { if (!res.writableEnded) res.write(JSON.stringify({ model, text }) + '\n'); })
+      .catch(err => { if (!res.writableEnded) res.write(JSON.stringify({ model, error: err.message }) + '\n'); })
+      .finally(() => { if (++finished === MODEL_NAMES.length) res.end(); });
+  }
 });
 
 // ── /api/synthesize — propose → challenge → revise ──
 app.post('/api/synthesize', requireAuth, rateLimit(60_000, 20), async (req, res) => {
   const { question, responses } = req.body;
-  if (!question || typeof question !== 'string') return res.status(400).json({ error: 'question is required' });
-  if (question.length > MAX_QUESTION_LEN) return res.status(400).json({ error: `question must be under ${MAX_QUESTION_LEN} characters` });
+  if (!question || typeof question !== 'string')  return res.status(400).json({ error: 'question is required' });
+  if (question.length > MAX_QUESTION_LEN)         return res.status(400).json({ error: `question must be under ${MAX_QUESTION_LEN} characters` });
   if (!responses || typeof responses !== 'object') return res.status(400).json({ error: 'responses is required' });
 
-  // Validate response values are strings
-  const safeResponses = {
-    claude: typeof responses.claude === 'string' ? responses.claude.slice(0, 4000) : null,
-    openai: typeof responses.openai === 'string' ? responses.openai.slice(0, 4000) : null,
-    gemini: typeof responses.gemini === 'string' ? responses.gemini.slice(0, 4000) : null,
-  };
+  const safe = Object.fromEntries(
+    MODEL_NAMES.map(name => [name, typeof responses[name] === 'string' ? responses[name].slice(0, 4000) : null])
+  );
 
-  // Randomize model → label so no model can identify its own response
-  const models   = ['claude', 'openai', 'gemini'];
-  const shuffled = [...models].sort(() => Math.random() - 0.5);
-  const labelOf  = {};
-  const modelOf  = {};
-  shuffled.forEach((model, i) => {
-    const label  = String.fromCharCode(65 + i);
-    labelOf[model] = label;
-    modelOf[label] = model;
+  // Blind labels: shuffle so no model can identify its own response
+  const shuffled = [...MODEL_NAMES].sort(() => Math.random() - 0.5);
+  const labelOf = {}, modelOf = {};
+  shuffled.forEach((name, i) => {
+    const label = String.fromCharCode(65 + i);
+    labelOf[name] = label;
+    modelOf[label] = name;
   });
 
-  const responseBlock = `--- Response ${labelOf['claude']} ---
-${safeResponses.claude || '[No response]'}
+  const responseBlock = MODEL_NAMES
+    .map(name => `--- Response ${labelOf[name]} ---\n${safe[name] || '[No response]'}`)
+    .join('\n\n');
 
---- Response ${labelOf['openai']} ---
-${safeResponses.openai || '[No response]'}
+  const labelsStr = MODEL_NAMES.map(n => `${labelOf[n]}=X/10`).join(', ');
+  const weaknessLines = MODEL_NAMES.map(n =>
+    `Response ${labelOf[n]} weakness: [specific flaw, or "none" if solid]`
+  ).join('\n');
 
---- Response ${labelOf['gemini']} ---
-${safeResponses.gemini || '[No response]'}`;
-
-  // ── Round 2: Challenge — all 3 models score + critique in parallel ──
+  // ── Round 2: Challenge ──
   const challengePrompt = `A user asked: "${question}"
 
 Three AI responses (identities hidden):
@@ -297,37 +318,14 @@ ${responseBlock}
 Score each response on factual accuracy and completeness (not style). Then identify the single biggest weakness or error in each. Be specific and critical — do not be agreeable or sycophantic.
 
 Output exactly in this format:
-Scores: ${labelOf['claude']}=X/10, ${labelOf['openai']}=X/10, ${labelOf['gemini']}=X/10
-Response ${labelOf['claude']} weakness: [specific flaw, or "none" if solid]
-Response ${labelOf['openai']} weakness: [specific flaw, or "none" if solid]
-Response ${labelOf['gemini']} weakness: [specific flaw, or "none" if solid]`;
+Scores: ${labelsStr}
+${weaknessLines}`;
 
-  const [claudeChallenge, openaiChallenge, geminiChallenge] = await Promise.allSettled([
-    callClaude(challengePrompt, 400),
-    process.env.OPENAI_API_KEY ? callOpenAI(challengePrompt, 400) : Promise.reject(new Error('No OpenAI key')),
-    process.env.GOOGLE_API_KEY ? callGemini(challengePrompt, 400) : Promise.reject(new Error('No Gemini key')),
-  ]);
+  const challengeResults = await Promise.allSettled(
+    MODEL_NAMES.map(name => callModel(name, challengePrompt, { maxTokens: 600 }))
+  );
 
-  function parseScores(text) {
-    if (!text) return null;
-    const m = text.match(/^Scores:\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10/im);
-    if (!m) return null;
-    return { [m[1]]: parseInt(m[2]), [m[3]]: parseInt(m[4]), [m[5]]: parseInt(m[6]) };
-  }
-
-  function parseChallenges(text) {
-    if (!text) return {};
-    const result = {};
-    for (const line of text.split('\n')) {
-      const m = line.match(/Response ([A-C]) weakness:\s*(.+)/i);
-      if (m) result[m[1]] = m[2].trim();
-    }
-    return result;
-  }
-
-  const judgeOutputs = [
-    claudeChallenge, openaiChallenge, geminiChallenge,
-  ].map(r => {
+  const judgeOutputs = challengeResults.map(r => {
     const text = r.status === 'fulfilled' ? r.value : null;
     return { scores: parseScores(text), challenges: parseChallenges(text) };
   });
@@ -337,22 +335,19 @@ Response ${labelOf['gemini']} weakness: [specific flaw, or "none" if solid]`;
     return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : '?';
   };
 
-  const finalScores = {
-    claude: avgFor(labelOf['claude']),
-    openai: avgFor(labelOf['openai']),
-    gemini: avgFor(labelOf['gemini']),
-  };
+  const finalScores = Object.fromEntries(MODEL_NAMES.map(n => [n, avgFor(labelOf[n])]));
 
   const challengeContext = judgeOutputs
     .map((j, i) => {
       const entries = Object.entries(j.challenges);
-      if (!entries.length) return null;
-      return `Evaluator ${i + 1}: ${entries.map(([label, flaw]) => `Response ${label}: ${flaw}`).join(' | ')}`;
+      return entries.length
+        ? `Evaluator ${i + 1}: ${entries.map(([l, flaw]) => `Response ${l}: ${flaw}`).join(' | ')}`
+        : null;
     })
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean).join('\n');
 
-  // ── Round 3: Revise — Claude synthesizes with full challenge context ──
+  // ── Round 3: Revise ──
+  const displayNames = { claude: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' };
   const synthesisPrompt = `A user asked: "${question}"
 
 Three AI responses (identities hidden):
@@ -365,7 +360,7 @@ ${challengeContext || 'No significant weaknesses identified.'}
 Using the strongest elements from each response and addressing the valid challenges, synthesize the definitive best answer. Do not mention this evaluation process.
 
 Output exactly in this format:
-Scores: ${labelOf['claude']}=X/10, ${labelOf['openai']}=X/10, ${labelOf['gemini']}=X/10
+Scores: ${labelsStr}
 
 ## ✨ Synthesized Answer
 
@@ -380,14 +375,30 @@ Rules:
 - Every sentence must carry factual payload. No hedging, no filler.`;
 
   try {
-    const claudeSynthesis = await callClaude(synthesisPrompt, 1800, { thinking: true, thinkingBudget: 8000 });
-    const scoresLine = `Scores: Claude=${finalScores.claude}/10, ChatGPT=${finalScores.openai}/10, Gemini=${finalScores.gemini}/10`;
-    const synthesis  = claudeSynthesis.replace(/^Scores:.*$/im, scoresLine);
-    res.json({ synthesis });
+    const synthesis = await callModel('claude', synthesisPrompt, { maxTokens: 1800, thinking: true, thinkingBudget: 8000 });
+    const scoresLine = `Scores: ${MODEL_NAMES.map(n => `${displayNames[n]}=${finalScores[n]}/10`).join(', ')}`;
+    res.json({ synthesis: synthesis.replace(/^Scores:.*$/im, scoresLine) });
   } catch {
     res.status(500).json({ error: 'Synthesis failed' });
   }
 });
+
+// ── Score / challenge parsers ──
+function parseScores(text) {
+  if (!text) return null;
+  const m = text.match(/^Scores:\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10,\s*([A-C])=(\d+)\/10/im);
+  return m ? { [m[1]]: +m[2], [m[3]]: +m[4], [m[5]]: +m[6] } : null;
+}
+
+function parseChallenges(text) {
+  if (!text) return {};
+  const result = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/Response ([A-C]) weakness:\s*(.+)/i);
+    if (m) result[m[1]] = m[2].trim();
+  }
+  return result;
+}
 
 app.listen(PORT, () => {
   console.log(`\n🚀 AI Arena running at http://localhost:${PORT}\n`);

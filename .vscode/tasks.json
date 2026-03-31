@@ -2,16 +2,26 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Setup",
+      "label": "Install dependencies",
       "type": "shell",
-      "command": "bash setup.sh",
-      "runOptions": {
-        "runOn": "folderOpen"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "command": "npm install",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Start AI Arena",
+      "type": "shell",
+      "command": "npm start",
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Claude Code",
+      "type": "shell",
+      "command": "claude",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true }
     }
   ]
 }

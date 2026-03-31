@@ -1793,23 +1793,41 @@ async function runAll() {
     const askRes = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-app-token': getToken() },
-      body: JSON.stringify({ question, history: conversationHistory.slice(-8) }),
+      body: JSON.stringify({ question, history: conversationHistory.slice(-8), stream: true }),
     });
-    const askData = await askRes.json();
-    responses = { claude: askData.claude, openai: askData.openai, gemini: askData.gemini };
-
-    ['claude', 'openai', 'gemini'].forEach(m => {
-      if (responses[m]) {
-        setStatus(m, 'done ✓');
-        setResp(m, responses[m]);
-      } else {
-        setStatus(m, 'error');
-        setResp(m, askData.errors?.[m] || 'No response', true);
+    if (!askRes.ok) {
+      const errData = await askRes.json().catch(() => ({}));
+      throw new Error(errData.error || `Server error ${askRes.status}`);
+    }
+    const reader = askRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.text) {
+            responses[msg.model] = msg.text;
+            setStatus(msg.model, 'done ✓');
+            setResp(msg.model, msg.text);
+          } else {
+            setStatus(msg.model, 'error');
+            setResp(msg.model, msg.error || 'No response', true);
+          }
+        } catch {}
       }
-    });
+    }
   } catch (err) {
     ['claude', 'openai', 'gemini'].forEach(m => {
-      setStatus(m, 'error'); setResp(m, `Network error: ${err.message}`, true);
+      if (!responses[m]) {
+        setStatus(m, 'error'); setResp(m, `Network error: ${err.message}`, true);
+      }
     });
     document.getElementById('runBtn').disabled = false;
     return;

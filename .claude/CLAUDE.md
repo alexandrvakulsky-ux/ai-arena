@@ -8,27 +8,19 @@ Multi-model AI comparison app. Sends a user question to Claude, GPT-4o, and Gemi
 - **Deploy:** Railway (auto-deploys from `main` branch via `railway.toml`)
 - **Local dev:** `npm start` → http://localhost:3000
 
-## Dev container (Cursor / VS Code) — Windows, Mac, Linux
-Setup matches [Anthropic’s Claude Code devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer): **Claude Code is pre-installed in the image** — you do **not** run `npm install` for it. After the container is created, **post-create** runs **`npm install` only for this app** (Express, etc.).
+## Dev container
+Image includes: Claude Code CLI, Puppeteer MCP server (screenshots), Chrome. `postCreateCommand` runs `npm install` for this app, copies `.env.example`, and clones `claude-sync` config repo.
 
-**Works on all devices.** `~/.claude` is stored in a named Docker volume (`claude-code-config-ai-arena`) — no Windows/Mac path differences. On first run, `post-create.sh` auto-clones the `claude-sync` private repo into the volume so your Claude config, memory, and session history are available immediately.
+**Flow:**
+1. Open in Cursor/VS Code → **Reopen in Container** (rebuild if Dockerfile changed).
+2. `claude` in terminal or **Run Task → Claude Code**.
+3. `npm start` or **Run Task → Start AI Arena** — port 3000 forwarded automatically.
+4. API keys go in `.env` (auto-created from `.env.example` on first run).
+**If firewall breaks (`EAI_AGAIN` / timeouts):**
+- `sudo /usr/local/bin/reset-iptables.sh` — emergency unlock
+- `sudo /usr/local/bin/init-firewall.sh` — re-apply the full allowlist
 
-**Typical flow (Claude Code–first):**
-1. Open the repo in Cursor/VS Code → **Reopen in Container** (rebuild only if Dockerfile changed).
-2. Terminal: `claude` — or **Run Task → “Claude Code (terminal)”**.
-3. **Run Task → “Start AI Arena”** or `npm start` — app on port **3000** (forwarded automatically).
-4. Put API keys in **`.env`** (auto-created from `.env.example` on first run).
-
-**First time on a new device (SSH key not yet set up):** The claude-sync clone step will be skipped — add your API keys to `.env` manually, then run `git clone git@github.com:alexandrvakulsky-ux/claude-sync.git ~/.claude` once SSH is configured.
-
-You normally **do not** need to touch `node_modules` or global npm yourself; if dependencies look wrong, **Run Task → “Install dependencies”**.
-
-**Firewall / “EAI_AGAIN” / GitHub `curl` timeout:** The container runs a strict egress firewall (`postStartCommand`). **`node` is only allowed passwordless `sudo` for two commands** — not arbitrary `iptables`. If **`sudo` asks for a password**, you ran something other than these (or the image is outdated — **rebuild** the dev container).
-
-- **`sudo /usr/local/bin/reset-iptables-policies.sh`** — emergency: set IPv4 default policies to **ACCEPT** (fixes “stuck DROP” after Ctrl+C). *Requires image with this script; otherwise skip to the next line.*
-- **`sudo /usr/local/bin/init-firewall.sh`** — apply the full allowlist (also resets policies to ACCEPT at the start of the script).
-
-If a firewall run was **interrupted**, use **reset** then **init-firewall**, or run **init-firewall** alone if your `init-firewall.sh` is already the latest from this repo. DNS must match **`/etc/resolv.conf`** for **EAI_AGAIN** fixes.
+These are the only two commands that work without a password. If `sudo` asks for a password, the image is outdated — rebuild the container.
 
 ## Environment variables
 Required in `.env` (never committed to git):
@@ -37,46 +29,79 @@ Required in `.env` (never committed to git):
 - `GOOGLE_API_KEY` — Gemini
 - `APP_PASSWORD` — password gate for the UI
 
-## Models in use
-- Claude: `claude-opus-4-6` (synthesis uses extended thinking, budget 8000 tokens)
-- OpenAI: `gpt-4o`
-- Gemini: `gemini-2.5-flash`
+## Models (PROVIDERS registry in server.js)
+- Claude: `claude-opus-4-6` — 2000 tokens, 45s timeout (90s with thinking)
+- OpenAI: `gpt-4o` — 2000 tokens, 45s timeout
+- Gemini: `gemini-2.5-flash` — 2000 tokens, 60s timeout
+
+Adding a model = add one entry to `PROVIDERS` in `server.js`.
 
 ## API endpoints
-- `POST /api/ask` — runs all 3 models in parallel, returns `{ claude, openai, gemini, errors }`
+- `POST /api/ask` — all 3 models in parallel; `stream: true` for NDJSON progressive delivery
 - `POST /api/synthesize` — 3-round P→C→R protocol, returns synthesis with averaged scores
-- `POST /api/auth` — password check, returns SESSION_TOKEN
-- `GET /api/verify` — validates stored token via x-app-token header
+- `POST /api/auth` — password check → SESSION_TOKEN
+- `GET /api/verify` — validates token via x-app-token header
 
 ## Synthesis protocol (3 rounds)
 1. `/api/ask` — all 3 models answer in parallel
-2. Challenge round — all 3 models score + critique anonymized responses (A/B/C) in parallel
-3. Revise round — Claude synthesizes with extended thinking using all challenges as context
-- Scores averaged across all 3 judges, substituted into Claude's output
-- Hard output format: `Scores: Claude=X/10, ChatGPT=X/10, Gemini=X/10` then `## ✨ Synthesized Answer`
+2. Challenge — all 3 score + critique anonymized responses (A/B/C)
+3. Revise — Claude synthesizes with extended thinking using all challenges
+- Scores averaged across judges, substituted into output
+- Format: `Scores: Claude=X/10, ChatGPT=X/10, Gemini=X/10` then `## ✨ Synthesized Answer`
 
 ## Security
 - SESSION_TOKEN auth (random 32 bytes, regenerates on restart)
 - 5 wrong attempts → 15 min IP lockout
-- Rate limiting: 10/min on auth, 20/min on API calls
-- DOMPurify on all markdown output, security headers on all routes
-- Headers: CSP, HSTS, X-Frame-Options, Permissions-Policy, Referrer-Policy, X-Permitted-Cross-Domain-Policies
-- Missing API keys logged as warnings on startup (not silent failures)
+- Rate limiting: 10/min auth, 20/min API
+- DOMPurify on markdown, CSP + HSTS + security headers
+- Missing API keys logged as warnings on startup
 
 ## Git workflow
 - Auto-commit + push on every file edit (Claude Code PostToolUse hook)
-- Auto git pull on every Claude Code session start (SessionStart hook)
-- Always work on `main` branch directly
+- Auto git pull on session start (SessionStart hook)
+- Work on `main` branch directly
+- Before any major change, create a checkpoint tag: `git tag checkpoint-<short-description>`
+- To roll back: `git log --oneline` to find the commit, `git revert <hash>` to undo safely
 
-## Memory instructions
-At the end of any session where significant changes were made, update the memory files in:
-`/home/node/.claude/projects/-workspace/memory/`
+## How to work
 
-Update whichever files are affected:
-- `project_aiarena.md` — stack, models, workflow changes
-- `project_aiarena_prompt.md` — synthesis protocol or prompt changes
-- `project_aiarena_design.md` — UI/frontend changes
-- `project_aiarena_security.md` — security changes
-- `project_claudecode_settings.md` — hooks or Claude Code config changes
+**Before starting:**
+- Read relevant files fully before editing — never modify code you haven't read
+- For non-trivial tasks, create a checkpoint tag first
+- If the request is ambiguous, ask one clarifying question before starting
 
-Always update `MEMORY.md` index if files are added or renamed.
+**While working:**
+- Smallest change that solves the problem — no refactoring or cleanup beyond what was asked
+- No new npm dependencies without explicit approval
+- No TypeScript, no build steps — keep it vanilla JS/Node
+
+**After finishing — feedback loop (priority):**
+- Gather evidence before asking for feedback — don't ask "does it look right?" blind:
+  - UI/frontend change → take a Puppeteer screenshot and show it
+  - API/backend change → run `npm test` and show results
+  - Full flow change → use Puppeteer to walk through the actual interaction
+- If Puppeteer or the server isn't running, say so and ask the user to start it — don't skip
+- After showing evidence: "Does this match what you expected, or should I adjust anything?"
+- Skip only for trivial fixes where the outcome is self-evident
+
+**Never:**
+- Change the synthesis output format (`Scores: Claude=X/10...` + `## ✨ Synthesized Answer`) — frontend parses it exactly
+- Log request bodies or expose API keys
+- Add comments or annotations to code you didn't change
+- Guess at missing context — ask instead
+
+## Proactive tooling suggestions (part of every session)
+This is a core responsibility, not optional. Regularly research (Twitter/X, GitHub) what Claude Code power users are doing to improve their workflows. Bring up a suggestion when:
+- We just finished a task that was harder than it needed to be
+- A gap in verification, testing, or deployment visibility becomes apparent
+- A relevant new tool or technique surfaces that fits this stack
+
+When suggesting: name the tool, explain the specific gap it fills in *this* project, and offer to set it up. Don't dump lists — one sharp suggestion at the right moment. Areas to watch:
+- Visual verification (Puppeteer, browser automation)
+- API/endpoint testing and monitoring
+- Deployment visibility (Railway logs, health checks, uptime)
+- Error tracking and observability (Sentry, logging)
+- Workflow automation (hooks, MCP servers, slash commands)
+
+## Learning rules
+When the user corrects my approach or confirms something worked well, update this file immediately to lock in the lesson.
