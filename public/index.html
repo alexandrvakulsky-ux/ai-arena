@@ -1600,19 +1600,20 @@ function closeViewer() {
 }
 
 function continueConversation() {
-  if (!viewerSessionId) return;
-  const turns = getHistory().filter(e => e.sessionId === viewerSessionId).reverse(); // oldest-first
+  if (!viewerTurns) return;
+  const turns = viewerTurns;
   closeViewer();
   resetConversation();
-  activeSessionId = viewerSessionId; // new questions join the same conversation
+  activeSessionId = viewerSessionId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
   turns.forEach(t => {
     const clean = t.synthesis ? stripScores(t.synthesis).slice(0, 2000) : '';
     conversationHistory.push({ question: t.question.slice(0, 500), synthesis: clean });
     addTurnToThread(t.question, clean || '(no synthesis)');
   });
   if (conversationHistory.length > 8) conversationHistory.splice(0, conversationHistory.length - 8);
-  currentQuestion  = turns[turns.length - 1]?.question || '';
-  currentSynthesis = turns[turns.length - 1]?.synthesis ? stripScores(turns[turns.length - 1].synthesis).slice(0, 2000) : '';
+  const last = turns[turns.length - 1];
+  currentQuestion  = last?.question || '';
+  currentSynthesis = last?.synthesis ? stripScores(last.synthesis).slice(0, 2000) : '';
   document.getElementById('pdfBtn').hidden = false;
   document.getElementById('questionInput').focus();
 }
@@ -1706,7 +1707,7 @@ function renderVerdict(text) {
 }
 
 // ── CONVERSATION HISTORY ──
-let conversationHistory = []; // { question, synthesis } — current session only
+let conversationHistory = [];
 let activeSessionId = null;
 let viewerSessionId = null;
 let viewerTurns     = null; // turns (oldest-first) cached from last openViewer call
