@@ -46,12 +46,14 @@
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-ai-arena,target=/commandhistory,type=volume",
-    "source=claude-code-config-ai-arena,target=/home/node/.claude,type=volume"
+    "source=claude-code-config-ai-arena,target=/home/node/.claude,type=volume",
+    "source=/mnt/wslg/runtime-dir/pulse,target=/tmp/wslg-pulse,type=bind,consistency=cached"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
-    "POWERLEVEL9K_DISABLE_GITSTATUS": "true"
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    "PULSE_SERVER": "unix:/tmp/wslg-pulse/native"
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
