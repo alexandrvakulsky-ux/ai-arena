@@ -1449,7 +1449,7 @@ function renderHistory() {
       <button class="history-del" title="Delete">✕</button>`;
     item.querySelector('.history-del').onclick = (e) => sid ? deleteConversation(sid, e) : deleteEntry(i, e);
     const d = domIndex++;
-    item.onclick = () => openViewer(d, sid || null);
+    item.onclick = () => loadConversation(d, sid || null);
     list.appendChild(item);
   });
 }
