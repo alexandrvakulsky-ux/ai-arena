@@ -1347,7 +1347,7 @@ function loadConversation(domIndex, sessionId) {
     const full  = t.synthesis ? stripScores(t.synthesis) : '';
     const clean = full.slice(0, 2000);
     conversationHistory.push({ question: t.question.slice(0, 500), synthesis: clean });
-    addTurnToThread(t.question, full || '(no synthesis)');
+    addTurnToThread(t.question, full || '(no synthesis)', true);
   });
   if (conversationHistory.length > 8) conversationHistory.splice(0, conversationHistory.length - 8);
   const last = turns[turns.length - 1];
