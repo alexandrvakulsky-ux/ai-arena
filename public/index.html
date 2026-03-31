@@ -1143,6 +1143,13 @@
   .hv-meta { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
   .hv-question { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 20px; line-height: 1.4; }
 
+  #hv-thread-summary { margin-bottom: 14px; }
+  .hv-prior-turn { background: var(--surface); border-left: 2px solid var(--border); padding: 7px 12px; margin-bottom: 6px; border-radius: 0 6px 6px 0; }
+  .hv-prior-q { font-size: 12px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hv-prior-s { font-size: 11px; color: var(--dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hv-continue-btn { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; font-weight: 500; transition: opacity 0.15s; }
+  .hv-continue-btn:hover { opacity: 0.85; }
+
   /* CONVERSATION THREAD */
   .conv-thread {
     display: none;
@@ -1518,11 +1525,19 @@ function renderHistory() {
   list.querySelectorAll('.history-item').forEach(el => el.remove());
   if (h.length === 0) { empty.style.display = 'block'; return; }
   empty.style.display = 'none';
+  const sessionTurns = new Map();
+  h.forEach(entry => {
+    if (entry.sessionId) {
+      if (!sessionTurns.has(entry.sessionId)) sessionTurns.set(entry.sessionId, []);
+      sessionTurns.get(entry.sessionId).push(entry);
+    }
+  });
   const seen = new Set();
+  let domIndex = 0;
   h.forEach((entry, i) => {
     const sid = entry.sessionId;
     if (sid) { if (seen.has(sid)) return; seen.add(sid); }
-    const turns = sid ? h.filter(e => e.sessionId === sid) : [entry];
+    const turns = sid ? sessionTurns.get(sid) : [entry];
     const item = document.createElement('div');
     item.className = 'history-item';
     item.innerHTML = `
@@ -1530,7 +1545,8 @@ function renderHistory() {
       <div class="history-item-meta">${turns.length > 1 ? `${turns.length} turns · ` : ''}${fmtDate(entry.timestamp)}</div>
       <button class="history-del" title="Delete">✕</button>`;
     item.querySelector('.history-del').onclick = (e) => sid ? deleteConversation(sid, e) : deleteEntry(i, e);
-    item.onclick = () => openViewer(i, sid || null);
+    const d = domIndex++;
+    item.onclick = () => openViewer(d, sid || null);
     list.appendChild(item);
   });
 }
