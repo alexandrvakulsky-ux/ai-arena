@@ -89,6 +89,10 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 # Claude Code CLI (same pattern as https://github.com/anthropics/claude-code/tree/main/.devcontainer)
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
+# Puppeteer MCP server (screenshot/visual verification for Claude Code)
+RUN PUPPETEER_SKIP_DOWNLOAD=true npm install -g @modelcontextprotocol/server-puppeteer && \
+    node /usr/local/share/npm-global/lib/node_modules/@modelcontextprotocol/server-puppeteer/node_modules/puppeteer/install.mjs
+
 USER root
 # Passwordless sudo only for these exact paths (not raw `iptables` — that would prompt for node’s password, which is usually unset).
 RUN printf '%s\n' \
