@@ -39,7 +39,12 @@
           },
           {
             "type": "command",
-            "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server. Required: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, APP_PASSWORD\"}' || true"
+            "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server.\"}' || true"
+          },
+          {
+            "type": "command",
+            "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null | grep -q '200\\|401\\|302' || { [ -f /workspace/.env ] && ! grep -q 'your-key-here\\|your-password-here' /workspace/.env && cd /workspace && nohup npm start >> /tmp/ai-arena-server.log 2>&1 & echo '{\"systemMessage\": \"Server was not running — started automatically on port 3000.\"}'; }",
+            "statusMessage": "Checking server..."
           }
         ]
       }
@@ -73,6 +78,11 @@
             "type": "command",
             "command": "node -e \"let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{const f=(JSON.parse(d).tool_input||{}).file_path||''; process.stdout.write(f)})\" | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; } 2>/dev/null || true",
             "statusMessage": "Committing and pushing..."
+          },
+          {
+            "type": "command",
+            "command": "node -e \"let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{const f=(JSON.parse(d).tool_input||{}).file_path||''; process.stdout.write(f)})\" | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
+            "statusMessage": "Restarting server if needed..."
           }
         ]
       },
