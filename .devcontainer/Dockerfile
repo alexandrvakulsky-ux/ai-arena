@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   vim \
   # Chrome/Puppeteer system dependencies
+  libnspr4 \
   libnss3 \
   libatk1.0-0 \
   libatk-bridge2.0-0 \
