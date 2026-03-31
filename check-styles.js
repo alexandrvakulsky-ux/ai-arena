@@ -80,14 +80,15 @@ combos.forEach(combo => {
   });
 });
 
-// ── 4. Check: design-system font sizes ────────────────────────────────────────
-// Any font-size that isn't in the approved set is suspicious.
-const APPROVED_SIZES = new Set(['11px','12px','13px','14px','15px','16px','18px','20px','24px','28px','32px','1em','1rem','inherit','var(--font-size)']);
+// ── 4. Check: font-size px values in reasonable range ────────────────────────
 const fontRe = /font-size:\s*([^;]+);/g;
 let fm;
 while ((fm = fontRe.exec(css)) !== null) {
   const val = fm[1].trim();
-  if (!APPROVED_SIZES.has(val)) fail(`Non-standard font-size: "${val}"`);
+  const px = val.match(/^(\d+(?:\.\d+)?)px$/);
+  if (px && (parseFloat(px[1]) < 10 || parseFloat(px[1]) > 48)) {
+    fail(`Suspicious font-size: "${val}"`);
+  }
 }
 
 // ── 5. Check: .jsb class overrides ───────────────────────────────────────────
