@@ -60,6 +60,8 @@ Required in `.env` (never committed to git):
 - 5 wrong attempts → 15 min IP lockout
 - Rate limiting: 10/min on auth, 20/min on API calls
 - DOMPurify on all markdown output, security headers on all routes
+- Headers: CSP, HSTS, X-Frame-Options, Permissions-Policy, Referrer-Policy, X-Permitted-Cross-Domain-Policies
+- Missing API keys logged as warnings on startup (not silent failures)
 
 ## Git workflow
 - Auto-commit + push on every file edit (Claude Code PostToolUse hook)
