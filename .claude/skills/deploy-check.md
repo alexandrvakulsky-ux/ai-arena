@@ -20,7 +20,8 @@ Confirm the app is working end-to-end and the deployment is clean.
    - Expect 401 (not 500) — confirms server is handling requests
 
 3. **Ask endpoint (all 3 providers)**
-   - POST to `/api/ask` with `{"question":"What is 1+1?","models":["claude","openai","gemini"]}`
+   - First get a valid token: `curl -s -X POST http://localhost:3000/api/auth -H "Content-Type: application/json" -d "{\"password\":\"$(grep APP_PASSWORD /workspace/.env | cut -d= -f2)\"}" | node -e "process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token||''))"`
+   - POST to `/api/ask` with the token in `x-app-token` header and `{"question":"What is 1+1?","models":["claude","openai","gemini"]}`
    - Confirm all 3 return a response (not error/timeout)
    - Note any provider that fails or times out
 
