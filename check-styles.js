@@ -108,16 +108,17 @@ combos.forEach(combo => {
   });
 });
 
-// ── 6. Check: dead CSS (classes in CSS not used in HTML) ─────────────────────
-// Only check classes that look like component-specific names (skip generic ones).
+// ── 6. Check: dead CSS (classes in CSS not used in HTML or JS) ───────────────
 const skipPrefixes = ['jsb','conv-','hv-','model-','history-','judge-','gate-','sf-','status-','score-','toggle-','pdf-','resp-','card-'];
 Object.keys(rules).forEach(sel => {
   if (!sel.startsWith('.')) return;
   const cls = sel.slice(1);
   if (skipPrefixes.some(p => cls.startsWith(p))) return;
   if (sel.includes(':') || sel.includes('>') || sel.includes(' ') || sel.includes('[')) return;
-  const used = new RegExp(`class="[^"]*\\b${cls}\\b`).test(html);
-  if (!used) fail(`Dead CSS: "${sel}" defined but never used in HTML`);
+  // Check static class attributes AND dynamic JS className assignments
+  const inHtml = new RegExp(`class="[^"]*\\b${cls}\\b`).test(html);
+  const inJs   = new RegExp(`className[^=]*=.*['"\`][^'"\`]*\\b${cls}\\b`).test(html);
+  if (!inHtml && !inJs) fail(`Dead CSS: "${sel}" defined but never used`);
 });
 
 // ── 7. Check: IDs in JS that don't exist in HTML ─────────────────────────────
