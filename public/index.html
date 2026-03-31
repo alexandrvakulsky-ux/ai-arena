@@ -1098,54 +1098,6 @@
     padding: 12px 14px;
   }
 
-  /* EXPAND OVERLAY */
-  #expandOverlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 600;
-    padding: 32px 16px;
-    overflow-y: auto;
-    align-items: flex-start;
-    justify-content: center;
-  }
-
-  #expandOverlay.open { display: flex; }
-
-  .expand-box {
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    width: 100%;
-    max-width: 720px;
-    padding: 24px;
-    position: relative;
-    margin: auto;
-    box-shadow: var(--shadow-modal);
-  }
-
-  .expand-box .model-response {
-    padding: 0;
-  }
-
-  .expand-close {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: transparent;
-    border: none;
-    color: var(--dim);
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    transition: color 0.15s;
-  }
-
-  .expand-close:hover {
-    color: var(--muted);
-  }
-
   /* HISTORY OVERLAY */
   #historyViewer {
     display: none;
