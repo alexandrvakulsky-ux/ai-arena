@@ -1510,7 +1510,10 @@ function shake() {
 
 function toggleEye() {
   const el = document.getElementById('pwInput');
-  el.type = el.type === 'password' ? 'text' : 'password';
+  const isPassword = el.type === 'password';
+  el.type = isPassword ? 'text' : 'password';
+  document.getElementById('eyeIcon').style.display = isPassword ? 'none' : '';
+  document.getElementById('eyeOffIcon').style.display = isPassword ? '' : 'none';
 }
 
 function unlock() {
