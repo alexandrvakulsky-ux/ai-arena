@@ -7,3 +7,4 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+watchPaths = ["server.js", "public/**", "package.json", "package-lock.json"]
