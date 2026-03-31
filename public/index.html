@@ -1796,6 +1796,7 @@ async function runAll() {
       body: JSON.stringify({ question, history: conversationHistory.slice(-8), stream: true }),
     });
     if (!askRes.ok) {
+      if (askRes.status === 401) { clearToken(); document.getElementById('passwordGate').style.display = ''; document.getElementById('app').style.display = 'none'; return; }
       const errData = await askRes.json().catch(() => ({}));
       throw new Error(errData.error || `Server error ${askRes.status}`);
     }
