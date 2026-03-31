@@ -1560,6 +1560,7 @@ function openViewer(domIndex, sessionId) {
   const h = getHistory();
   viewerSessionId = sessionId || null;
   const turns = sessionId ? h.filter(e => e.sessionId === sessionId).reverse() : [h[domIndex]];
+  viewerTurns = turns;
   const lastTurn = turns[turns.length - 1];
   if (!lastTurn) return;
 
