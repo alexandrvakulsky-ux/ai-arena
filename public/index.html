@@ -1514,15 +1514,19 @@ function renderHistory() {
   list.querySelectorAll('.history-item').forEach(el => el.remove());
   if (h.length === 0) { empty.style.display = 'block'; return; }
   empty.style.display = 'none';
+  const seen = new Set();
   h.forEach((entry, i) => {
+    const sid = entry.sessionId;
+    if (sid) { if (seen.has(sid)) return; seen.add(sid); }
+    const turns = sid ? h.filter(e => e.sessionId === sid) : [entry];
     const item = document.createElement('div');
     item.className = 'history-item';
     item.innerHTML = `
       <div class="history-item-q">${escHtml(entry.question)}</div>
-      <div class="history-item-meta">${fmtDate(entry.timestamp)}</div>
+      <div class="history-item-meta">${turns.length > 1 ? `${turns.length} turns · ` : ''}${fmtDate(entry.timestamp)}</div>
       <button class="history-del" title="Delete">✕</button>`;
-    item.querySelector('.history-del').onclick = (e) => deleteEntry(i, e);
-    item.onclick = () => openViewer(i);
+    item.querySelector('.history-del').onclick = (e) => sid ? deleteConversation(sid, e) : deleteEntry(i, e);
+    item.onclick = () => openViewer(i, sid || null);
     list.appendChild(item);
   });
 }
