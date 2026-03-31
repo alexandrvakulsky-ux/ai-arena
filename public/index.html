@@ -1428,7 +1428,7 @@ function clearToken()     { sessionStorage.removeItem(K_TOKEN); }
 function init() {
   // Verify existing token, or auto-unlock if server has no password set
   fetch('/api/verify', { headers: { 'x-app-token': getToken() } })
-    .then(r => { if (r.ok) unlock(); });
+    .then(r => { if (r.ok) unlock(); else clearToken(); });
 }
 
 async function checkPw() {
