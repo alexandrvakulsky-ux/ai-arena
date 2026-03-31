@@ -76,13 +76,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; } 2>/dev/null || true",
-            "statusMessage": "Committing and pushing..."
-          },
-          {
-            "type": "command",
-            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
-            "statusMessage": "Restarting server if needed..."
+            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
+            "statusMessage": "Committing and restarting if needed..."
           }
         ]
       },
