@@ -52,7 +52,7 @@ const PROVIDERS = {
       const tokens = maxTokens ?? this.maxTokens;
       const body = {
         model: this.model,
-        max_tokens: thinking ? Math.max(tokens, thinkingBudget + 1000) : tokens,
+        max_tokens: thinking ? thinkingBudget + tokens : tokens,
         messages,
       };
       if (thinking) body.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
