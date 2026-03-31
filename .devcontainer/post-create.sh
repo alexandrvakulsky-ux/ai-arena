@@ -25,9 +25,23 @@ if [ ! -d “$HOME/.claude/.git” ]; then
         || echo “=== Note: SSH key not set up yet — claude-sync skipped. Add your API keys to .env manually, then run: git clone git@github.com:alexandrvakulsky-ux/claude-sync.git ~/.claude ===”
 fi
 
+# Install vc (voice-to-text for Claude Code)
+mkdir -p “$HOME/.local/bin”
+chmod +x /workspace/scripts/voice-claude.sh
+chmod +x /workspace/scripts/validate-devcontainer.sh
+chmod +x /workspace/scripts/commit-with-devcontainer-guard.sh
+ln -sf /workspace/scripts/voice-claude.sh “$HOME/.local/bin/vc”
+
+# Ensure ~/.local/bin is in PATH
+if ! grep -q '\.local/bin' “$HOME/.zshrc” 2>/dev/null; then
+    echo 'export PATH=”$HOME/.local/bin:$PATH”' >> “$HOME/.zshrc”
+fi
+
 echo “”
 echo “=== Done ===”
 echo “• Claude Code CLI: already in this image — in Terminal run:  claude”
 echo “• Start the web app:  npm start   (or Task: Run → Start AI Arena)”
 echo “• API keys: edit .env and add your keys (already created from .env.example)”
+echo “• Voice input: run 'vc' to record a voice prompt (transcribed via Whisper)”
+echo “  Usage: claude -p \”\$(vc)\”  or  vc | claude”
 echo “”
