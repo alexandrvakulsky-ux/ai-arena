@@ -762,11 +762,13 @@
     border-radius: var(--radius-lg);
     padding: 22px 22px 24px;
     opacity: 0;
-    transition: opacity 0.12s ease;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
   }
 
   .judge-panel.visible {
     opacity: 1;
+    transform: translateY(0);
   }
 
   .judge-header {
