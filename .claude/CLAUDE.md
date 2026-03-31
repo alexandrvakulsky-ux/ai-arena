@@ -43,8 +43,11 @@ Research (Twitter/X, GitHub) what Claude Code power users are doing. Suggest one
 - A relevant new technique surfaces for this stack
 
 ## Verification after every HTML/CSS change
-Always run `node check-styles.js` after touching `public/index.html`. Fix all failures before finishing.
-It catches: conflicting CSS properties on co-applied classes, `.jsb` overrides, dead CSS, and missing DOM elements.
+After touching `public/index.html`, always:
+1. `node check-styles.js` — catches CSS conflicts, dead classes, missing IDs. Fix all failures.
+2. `node screenshot.js` — take a screenshot and show it to confirm the UI looks right before asking the user.
+
+`screenshot.js` requires the container to be rebuilt with the Dockerfile fix (libpango-1.0-0 + libcairo2 now included). If Chrome fails to launch, say so and skip to check-styles only.
 
 ## Learning rules
 When the user corrects my approach or confirms something worked well, update the relevant rules file immediately to lock in the lesson.
