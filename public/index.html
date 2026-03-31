@@ -1566,8 +1566,6 @@ function renderVerdict(text) {
 // ── CONVERSATION HISTORY ──
 let conversationHistory = [];
 let activeSessionId = null;
-let viewerSessionId = null;
-let viewerTurns     = null; // turns (oldest-first) cached from last openViewer call
 
 function resetConversation() {
   conversationHistory = [];
