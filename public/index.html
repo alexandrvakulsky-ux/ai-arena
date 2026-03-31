@@ -1846,6 +1846,7 @@ async function runAll() {
       headers: { 'Content-Type': 'application/json', 'x-app-token': getToken() },
       body: JSON.stringify({ question, responses }),
     });
+    if (synRes.status === 401) { clearToken(); document.getElementById('passwordGate').style.display = ''; document.getElementById('app').style.display = 'none'; return; }
     const synData = await synRes.json();
     if (synData.error) throw new Error(synData.error);
     synthesis = synData.synthesis;
