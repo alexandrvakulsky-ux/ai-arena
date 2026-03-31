@@ -1614,6 +1614,7 @@ function continueConversation() {
   const last = turns[turns.length - 1];
   currentQuestion  = last?.question || '';
   currentSynthesis = last?.synthesis ? stripScores(last.synthesis).slice(0, 2000) : '';
+  document.getElementById('emptyState').style.display = 'none';
   document.getElementById('pdfBtn').hidden = false;
   document.getElementById('questionInput').focus();
 }
