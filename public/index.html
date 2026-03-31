@@ -1493,6 +1493,12 @@ function deleteEntry(i, e) {
   renderHistory();
 }
 
+function deleteConversation(sid, e) {
+  e.stopPropagation();
+  localStorage.setItem(K_HIST, JSON.stringify(getHistory().filter(t => t.sessionId !== sid)));
+  renderHistory();
+}
+
 function fmtDate(ts) {
   const d = new Date(ts), diff = Date.now() - d;
   if (diff < 60000) return 'just now';
@@ -1642,6 +1648,7 @@ let viewerSessionId  = null; // sessionId currently open in the history viewer
 
 function resetConversation() {
   conversationHistory = [];
+  activeSessionId = null;
   currentQuestion  = '';
   currentSynthesis = '';
   document.getElementById('pdfBtn').hidden = true;
@@ -1858,7 +1865,8 @@ async function runAll() {
   }
 
   document.getElementById('runBtn').disabled = false;
-  pushHistory({ question, responses, synthesis, timestamp: Date.now() });
+  if (!activeSessionId) activeSessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  pushHistory({ question, responses, synthesis, timestamp: Date.now(), sessionId: activeSessionId });
 
   if (synthesis) {
     const cleanSynthesis = stripScores(synthesis).slice(0, 2000);
