@@ -42,5 +42,9 @@ Research (Twitter/X, GitHub) what Claude Code power users are doing. Suggest one
 - A gap in verification, testing, or deployment visibility appears
 - A relevant new technique surfaces for this stack
 
+## Verification after every HTML/CSS change
+Always run `node check-styles.js` after touching `public/index.html`. Fix all failures before finishing.
+It catches: conflicting CSS properties on co-applied classes, `.jsb` overrides, dead CSS, and missing DOM elements.
+
 ## Learning rules
 When the user corrects my approach or confirms something worked well, update the relevant rules file immediately to lock in the lesson.
