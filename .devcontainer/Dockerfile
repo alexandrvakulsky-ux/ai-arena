@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   man-db \
   unzip \
   gnupg2 \
+  wget \
   gh \
   iptables \
   ipset \
@@ -25,6 +26,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   nano \
   vim \
+  # Chrome/Puppeteer system dependencies
+  libnss3 \
+  libatk1.0-0 \
+  libatk-bridge2.0-0 \
+  libcups2 \
+  libdrm2 \
+  libdbus-1-3 \
+  libxkbcommon0 \
+  libx11-6 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxext6 \
+  libxfixes3 \
+  libxrandr2 \
+  libgbm1 \
+  libasound2 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure default node user has access to /usr/local/share
@@ -34,8 +51,7 @@ RUN mkdir -p /usr/local/share/npm-global && \
 ARG USERNAME=node
 
 # Persist bash history
-RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
-  && mkdir /commandhistory \
+RUN mkdir /commandhistory \
   && touch /commandhistory/.bash_history \
   && chown -R $USERNAME /commandhistory
 
@@ -70,11 +86,23 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -x
 
+# Claude Code CLI (same pattern as https://github.com/anthropics/claude-code/tree/main/.devcontainer)
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
-COPY init-firewall.sh /usr/local/bin/
 USER root
-RUN chmod +x /usr/local/bin/init-firewall.sh && \
-  echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
+# Passwordless sudo only for these exact paths (not raw `iptables` — that would prompt for node’s password, which is usually unset).
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'iptables -P INPUT ACCEPT 2>/dev/null || true' \
+  'iptables -P FORWARD ACCEPT 2>/dev/null || true' \
+  'iptables -P OUTPUT ACCEPT 2>/dev/null || true' \
+  'echo "iptables: INPUT/FORWARD/OUTPUT default policies -> ACCEPT"' \
+  > /usr/local/bin/reset-iptables-policies.sh && \
+  chmod +x /usr/local/bin/reset-iptables-policies.sh && \
+  printf '#!/bin/bash\nexec bash /workspace/.devcontainer/init-firewall.sh "$@"\n' > /usr/local/bin/init-firewall.sh && \
+  chmod +x /usr/local/bin/init-firewall.sh && \
+  printf '%s\n' \
+  'node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/local/bin/reset-iptables-policies.sh' \
+  > /etc/sudoers.d/node-firewall && \
   chmod 0440 /etc/sudoers.d/node-firewall
 USER node
