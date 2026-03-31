@@ -22,6 +22,13 @@ if [ ! -f .env ] && [ -f .env.example ]; then
     echo "Created .env from .env.example — fill in your API keys."
 fi
 
+# Restore Claude Code credentials from backup (survives container rebuilds)
+if [ ! -f "$HOME/.claude/.credentials.json" ] && [ -f /workspace/.claude-credentials.json ]; then
+    cp /workspace/.claude-credentials.json "$HOME/.claude/.credentials.json"
+    chmod 600 "$HOME/.claude/.credentials.json"
+    echo "Claude Code credentials restored from backup."
+fi
+
 # claude-sync: clone config repo into ~/.claude on first run (needs SSH key)
 # Volume mount creates the directory — clone only if it's empty (no .git yet)
 if [ ! -d "$HOME/.claude/.git" ]; then
@@ -29,6 +36,11 @@ if [ ! -d "$HOME/.claude/.git" ]; then
     git clone --depth 1 git@github.com:alexandrvakulsky-ux/claude-sync.git "$HOME/.claude" 2>/dev/null \
         && echo "Claude config synced from GitHub." \
         || echo "Note: claude-sync skipped (SSH key not set up). Run manually later:"$'\n'"  git clone git@github.com:alexandrvakulsky-ux/claude-sync.git ~/.claude"
+fi
+
+# Load API keys into shell so Claude Code CLI picks them up automatically
+if ! grep -q 'workspace/.env' "$HOME/.zshrc" 2>/dev/null; then
+    echo '[ -f /workspace/.env ] && set -a && . /workspace/.env && set +a' >> "$HOME/.zshrc"
 fi
 
 echo ""
