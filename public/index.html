@@ -1458,56 +1458,12 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── HISTORY VIEWER ──
-function openViewer(domIndex, sessionId) {
+function loadConversation(domIndex, sessionId) {
   const h = getHistory();
-  viewerSessionId = sessionId || null;
   const turns = sessionId ? h.filter(e => e.sessionId === sessionId).reverse() : [h[domIndex]];
-  viewerTurns = turns;
-  const lastTurn = turns[turns.length - 1];
-  if (!lastTurn) return;
-
-  const first = turns[0];
-  document.getElementById('hvMeta').textContent =
-    (turns.length > 1 ? `${turns.length}-turn conversation · ` : '') +
-    fmtDate(first.timestamp) + ' · ' + new Date(first.timestamp).toLocaleTimeString();
-
-  const summaryEl = document.getElementById('hv-thread-summary');
-  summaryEl.innerHTML = '';
-  turns.slice(0, -1).forEach(t => {
-    const div = document.createElement('div');
-    div.className = 'hv-prior-turn';
-    const snip = t.synthesis ? escHtml(stripScores(t.synthesis).replace(/#+\s*/g, '').slice(0, 130)) + '…' : '';
-    div.innerHTML = `<div class="hv-prior-q">${escHtml(t.question)}</div>${snip ? `<div class="hv-prior-s">${snip}</div>` : ''}`;
-    summaryEl.appendChild(div);
-  });
-
-  document.getElementById('hvQuestion').textContent =
-    (turns.length > 1 ? `Turn ${turns.length}: ` : '') + lastTurn.question;
-  ['claude', 'openai', 'gemini'].forEach(m => {
-    document.getElementById(`hv-${m}`).innerHTML = lastTurn.responses?.[m]
-      ? DOMPurify.sanitize(marked.parse(lastTurn.responses[m])) : '(no response)';
-  });
-  const synEl = document.getElementById('hv-synthesis');
-  synEl.innerHTML = '';
-  if (lastTurn.synthesis) renderVerdictInto(lastTurn.synthesis, synEl);
-  else synEl.textContent = '(no synthesis saved)';
-
-  document.getElementById('historyViewer').classList.add('open');
-  document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === domIndex));
-}
-
-function closeViewer() {
-  document.getElementById('historyViewer').classList.remove('open');
-  document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
-}
-
-function continueConversation() {
-  if (!viewerTurns) return;
-  const turns = viewerTurns;
-  closeViewer();
+  if (!turns.length) return;
   resetConversation();
-  activeSessionId = viewerSessionId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  activeSessionId = sessionId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
   turns.forEach(t => {
     const clean = t.synthesis ? stripScores(t.synthesis).slice(0, 2000) : '';
     conversationHistory.push({ question: t.question.slice(0, 500), synthesis: clean });
@@ -1519,12 +1475,9 @@ function continueConversation() {
   currentSynthesis = last?.synthesis ? stripScores(last.synthesis).slice(0, 2000) : '';
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('pdfBtn').hidden = false;
+  document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === domIndex));
   document.getElementById('questionInput').focus();
 }
-
-document.getElementById('historyViewer').addEventListener('click', function(e) {
-  if (e.target === this) closeViewer();
-});
 
 // ── UI HELPERS ──
 function setStatus(m, t) {
