@@ -70,7 +70,7 @@ Required in `.env` (never committed to git):
 
 ## Memory instructions
 At the end of any session where significant changes were made, update the memory files in:
-`C:\Users\Alex\.claude\projects\C--Users-Alex-Downloads-ai-arena-ai-arena\memory\`
+`/home/node/.claude/projects/-workspace/memory/`
 
 Update whichever files are affected:
 - `project_aiarena.md` — stack, models, workflow changes
