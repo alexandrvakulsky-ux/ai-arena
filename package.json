@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "codespace:boot": "bash scripts/codespace-bootstrap.sh",
-    "test": "node test-smoke.js"
+    "test": "node test-smoke.js",
+    "check": "node check-styles.js"
   },
   "keywords": [],
   "author": "",
