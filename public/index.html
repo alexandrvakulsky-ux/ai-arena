@@ -1488,10 +1488,10 @@ function addTurnToThread(question, synthesis, expanded = false) {
 
   const synHeader = document.createElement('div');
   synHeader.className = 'conv-synthesis-header';
-  synHeader.innerHTML = '<span class="conv-synthesis-label">✨ Synthesis</span><span class="conv-synthesis-toggle">expand ↓</span>';
+  synHeader.innerHTML = `<span class="conv-synthesis-label">✨ Synthesis</span><span class="conv-synthesis-toggle">${expanded ? 'collapse ↑' : 'expand ↓'}</span>`;
 
   const synBody = document.createElement('div');
-  synBody.className = 'conv-synthesis-body jsb';
+  synBody.className = 'conv-synthesis-body jsb' + (expanded ? ' open' : '');
   synBody.innerHTML = DOMPurify.sanitize(marked.parse(synthesis));
 
   synHeader.addEventListener('click', () => {
