@@ -37,6 +37,12 @@ const APP_PASSWORD = process.env.APP_PASSWORD || null;
 // Invalidates automatically on redeploy, so stolen tokens expire with each release.
 const SESSION_TOKEN = crypto.randomBytes(32).toString('hex');
 
+// ── Startup: warn about missing keys so failures are obvious immediately ──
+if (!process.env.ANTHROPIC_API_KEY) console.warn('⚠️  ANTHROPIC_API_KEY not set — Claude calls will fail');
+if (!process.env.OPENAI_API_KEY)    console.warn('⚠️  OPENAI_API_KEY not set — ChatGPT disabled');
+if (!process.env.GOOGLE_API_KEY)    console.warn('⚠️  GOOGLE_API_KEY not set — Gemini disabled');
+if (!process.env.APP_PASSWORD)      console.warn('⚠️  APP_PASSWORD not set — app has no password gate (open to anyone with the URL)');
+
 // ── Model config ──
 const MODELS = {
   claude: 'claude-opus-4-6',
