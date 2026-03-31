@@ -8,6 +8,28 @@ Multi-model AI comparison app. Sends a user question to Claude, GPT-4o, and Gemi
 - **Deploy:** Railway (auto-deploys from `main` branch via `railway.toml`)
 - **Local dev:** `npm start` → http://localhost:3000
 
+## Dev container (Cursor / VS Code) — Windows, Mac, Linux
+Setup matches [Anthropic’s Claude Code devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer): **Claude Code is pre-installed in the image** — you do **not** run `npm install` for it. After the container is created, **post-create** runs **`npm install` only for this app** (Express, etc.).
+
+**Works on all devices.** `~/.claude` is stored in a named Docker volume (`claude-code-config-ai-arena`) — no Windows/Mac path differences. On first run, `post-create.sh` auto-clones the `claude-sync` private repo into the volume so your Claude config, memory, and session history are available immediately.
+
+**Typical flow (Claude Code–first):**
+1. Open the repo in Cursor/VS Code → **Reopen in Container** (rebuild only if Dockerfile changed).
+2. Terminal: `claude` — or **Run Task → “Claude Code (terminal)”**.
+3. **Run Task → “Start AI Arena”** or `npm start` — app on port **3000** (forwarded automatically).
+4. Put API keys in **`.env`** (auto-created from `.env.example` on first run).
+
+**First time on a new device (SSH key not yet set up):** The claude-sync clone step will be skipped — add your API keys to `.env` manually, then run `git clone git@github.com:alexandrvakulsky-ux/claude-sync.git ~/.claude` once SSH is configured.
+
+You normally **do not** need to touch `node_modules` or global npm yourself; if dependencies look wrong, **Run Task → “Install dependencies”**.
+
+**Firewall / “EAI_AGAIN” / GitHub `curl` timeout:** The container runs a strict egress firewall (`postStartCommand`). **`node` is only allowed passwordless `sudo` for two commands** — not arbitrary `iptables`. If **`sudo` asks for a password**, you ran something other than these (or the image is outdated — **rebuild** the dev container).
+
+- **`sudo /usr/local/bin/reset-iptables-policies.sh`** — emergency: set IPv4 default policies to **ACCEPT** (fixes “stuck DROP” after Ctrl+C). *Requires image with this script; otherwise skip to the next line.*
+- **`sudo /usr/local/bin/init-firewall.sh`** — apply the full allowlist (also resets policies to ACCEPT at the start of the script).
+
+If a firewall run was **interrupted**, use **reset** then **init-firewall**, or run **init-firewall** alone if your `init-firewall.sh` is already the latest from this repo. DNS must match **`/etc/resolv.conf`** for **EAI_AGAIN** fixes.
+
 ## Environment variables
 Required in `.env` (never committed to git):
 - `ANTHROPIC_API_KEY` — Claude API
