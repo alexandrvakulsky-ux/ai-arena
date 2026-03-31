@@ -1556,21 +1556,18 @@ function escHtml(s) {
 }
 
 // ── HISTORY VIEWER ──
-function openViewer(index, sessionId) {
+function openViewer(domIndex, sessionId) {
   const h = getHistory();
   viewerSessionId = sessionId || null;
-  // All turns for this conversation, oldest-first for display
-  const turns = sessionId ? h.filter(e => e.sessionId === sessionId).reverse() : [h[index]];
+  const turns = sessionId ? h.filter(e => e.sessionId === sessionId).reverse() : [h[domIndex]];
   const lastTurn = turns[turns.length - 1];
   if (!lastTurn) return;
 
-  // Meta line
   const first = turns[0];
   document.getElementById('hvMeta').textContent =
     (turns.length > 1 ? `${turns.length}-turn conversation · ` : '') +
     fmtDate(first.timestamp) + ' · ' + new Date(first.timestamp).toLocaleTimeString();
 
-  // Prior-turns summary (all except the last)
   const summaryEl = document.getElementById('hv-thread-summary');
   summaryEl.innerHTML = '';
   turns.slice(0, -1).forEach(t => {
@@ -1581,19 +1578,19 @@ function openViewer(index, sessionId) {
     summaryEl.appendChild(div);
   });
 
-  // Latest turn
   document.getElementById('hvQuestion').textContent =
     (turns.length > 1 ? `Turn ${turns.length}: ` : '') + lastTurn.question;
-  document.getElementById('hv-claude').innerHTML = lastTurn.responses?.claude ? DOMPurify.sanitize(marked.parse(lastTurn.responses.claude)) : '(no response)';
-  document.getElementById('hv-openai').innerHTML = lastTurn.responses?.openai ? DOMPurify.sanitize(marked.parse(lastTurn.responses.openai)) : '(no response)';
-  document.getElementById('hv-gemini').innerHTML = lastTurn.responses?.gemini ? DOMPurify.sanitize(marked.parse(lastTurn.responses.gemini)) : '(no response)';
+  ['claude', 'openai', 'gemini'].forEach(m => {
+    document.getElementById(`hv-${m}`).innerHTML = lastTurn.responses?.[m]
+      ? DOMPurify.sanitize(marked.parse(lastTurn.responses[m])) : '(no response)';
+  });
   const synEl = document.getElementById('hv-synthesis');
   synEl.innerHTML = '';
   if (lastTurn.synthesis) renderVerdictInto(lastTurn.synthesis, synEl);
   else synEl.textContent = '(no synthesis saved)';
 
   document.getElementById('historyViewer').classList.add('open');
-  document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === index));
+  document.querySelectorAll('.history-item').forEach((el, i) => el.classList.toggle('active', i === domIndex));
 }
 
 function closeViewer() {
