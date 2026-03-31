@@ -76,12 +76,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{const f=(JSON.parse(d).tool_input||{}).file_path||''; process.stdout.write(f)})\" | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; } 2>/dev/null || true",
+            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; } 2>/dev/null || true",
             "statusMessage": "Committing and pushing..."
           },
           {
             "type": "command",
-            "command": "node -e \"let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{const f=(JSON.parse(d).tool_input||{}).file_path||''; process.stdout.write(f)})\" | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
+            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
             "statusMessage": "Restarting server if needed..."
           }
         ]
