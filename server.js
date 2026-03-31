@@ -97,7 +97,7 @@ const PROVIDERS = {
   gemini: {
     model:     'gemini-2.5-flash',
     envKey:    'GOOGLE_API_KEY',
-    maxTokens: 2000,
+    maxTokens: 4096,
     timeoutMs: 60000,
     async call(prompt, messages, { maxTokens, signal } = {}) {
       const contents = messages.map(m => ({
