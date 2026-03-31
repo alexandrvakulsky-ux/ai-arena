@@ -1344,9 +1344,10 @@ function loadConversation(domIndex, sessionId) {
   resetConversation();
   activeSessionId = sessionId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
   turns.forEach(t => {
-    const clean = t.synthesis ? stripScores(t.synthesis).slice(0, 2000) : '';
+    const full  = t.synthesis ? stripScores(t.synthesis) : '';
+    const clean = full.slice(0, 2000);
     conversationHistory.push({ question: t.question.slice(0, 500), synthesis: clean });
-    addTurnToThread(t.question, clean || '(no synthesis)');
+    addTurnToThread(t.question, full || '(no synthesis)');
   });
   if (conversationHistory.length > 8) conversationHistory.splice(0, conversationHistory.length - 8);
   const last = turns[turns.length - 1];
