@@ -121,10 +121,12 @@ Object.keys(rules).forEach(sel => {
 });
 
 // ── 7. Check: IDs in JS that don't exist in HTML ─────────────────────────────
+// Skip template literals (contain ${ }) — those are dynamic
 const getByIdRe = /getElementById\(['"`]([^'"`]+)['"`]\)/g;
 let gm;
 while ((gm = getByIdRe.exec(html)) !== null) {
   const id = gm[1];
+  if (id.includes('${')) continue;
   if (!new RegExp(`id="${id}"`).test(html)) {
     fail(`getElementById("${id}") — element not found in HTML`);
   }
