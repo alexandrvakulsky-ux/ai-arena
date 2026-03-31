@@ -1637,6 +1637,8 @@ function renderVerdict(text) {
 
 // ── CONVERSATION HISTORY ──
 let conversationHistory = []; // { question, synthesis } — current session only
+let activeSessionId  = null; // groups all turns of one chat into a conversation
+let viewerSessionId  = null; // sessionId currently open in the history viewer
 
 function resetConversation() {
   conversationHistory = [];
