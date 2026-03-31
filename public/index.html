@@ -527,12 +527,18 @@
     border-radius: var(--radius-md);
     padding: 0;
     opacity: 0;
-    transition: opacity 0.12s ease, border-color 0.12s ease;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease, border-color 0.15s ease, transform 0.2s ease;
     overflow: hidden;
   }
 
   .model-card.visible {
     opacity: 1;
+    transform: translateY(0);
+  }
+
+  .model-card:hover {
+    border-color: var(--border-strong);
   }
 
   #card-claude  { border-left: 3px solid var(--claude); }
