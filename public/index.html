@@ -410,7 +410,7 @@
   }
 
   .panel {
-    background: var(--surface-raised);
+    background: rgba(22, 24, 30, 0.88);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 18px 18px 16px;
@@ -418,7 +418,9 @@
     position: sticky;
     bottom: 20px;
     z-index: 20;
-    box-shadow: 0 -24px 48px rgba(12, 13, 16, 0.92);
+    box-shadow: var(--shadow-panel);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .empty-state {
