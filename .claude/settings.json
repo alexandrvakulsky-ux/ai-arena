@@ -90,6 +90,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
+            "statusMessage": "Checking skill triggers..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "node /workspace/scripts/save-session.js 2>/dev/null || true",
             "async": true
           }
