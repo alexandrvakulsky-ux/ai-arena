@@ -64,7 +64,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssh-server 
     && chown node:node /home/node/.ssh \
     && chmod 700 /home/node/.ssh
 COPY --chown=node:node authorized_keys /home/node/.ssh/authorized_keys
-RUN chmod 600 /home/node/.ssh/authorized_keys
+RUN chmod 600 /home/node/.ssh/authorized_keys && ssh-keygen -A
 EXPOSE 22
 
 USER node
