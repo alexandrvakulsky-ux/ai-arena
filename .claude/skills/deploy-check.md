@@ -9,7 +9,15 @@ tools: Bash
 ## Goal
 Confirm the app is working end-to-end and the deployment is clean.
 
+## Production URL
+https://ai-arena-production-92e7.up.railway.app
+
 ## Process
+
+0. **Railway production health**
+   - `curl -s https://ai-arena-production-92e7.up.railway.app/health`
+   - Expect `{"ok":true,...}` — if not, Railway hasn't deployed yet or is down
+   - Compare `git log origin/main --oneline -1` with production response uptime to gauge if latest push is live
 
 1. **Server running?**
    - `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`
