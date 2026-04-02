@@ -54,6 +54,17 @@ RUN printf '#!/bin/bash\nexec bash /workspace/.devcontainer/init-firewall.sh "$@
       > /usr/local/bin/init-firewall.sh && chmod +x /usr/local/bin/init-firewall.sh && \
     printf '#!/bin/sh\niptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT\necho "iptables policies reset to ACCEPT"\n' \
       > /usr/local/bin/reset-iptables.sh && chmod +x /usr/local/bin/reset-iptables.sh && \
-    echo 'node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/local/bin/reset-iptables.sh' \
+    echo 'node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/local/bin/reset-iptables.sh, /usr/sbin/sshd' \
       > /etc/sudoers.d/node-firewall && chmod 0440 /etc/sudoers.d/node-firewall
+
+# SSH server
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd /home/node/.ssh \
+    && chown node:node /home/node/.ssh \
+    && chmod 700 /home/node/.ssh
+COPY --chown=node:node authorized_keys /home/node/.ssh/authorized_keys
+RUN chmod 600 /home/node/.ssh/authorized_keys
+EXPOSE 22
+
 USER node
