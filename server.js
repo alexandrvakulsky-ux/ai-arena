@@ -239,7 +239,7 @@ app.post('/api/auth', rateLimit(60_000, 10), (req, res) => {
 app.get('/api/verify', requireAuth, (_req, res) => res.json({ ok: true }));
 
 // Health check — no auth, used by Railway and UptimeRobot
-app.get('/health', (_req, res) => res.json({ ok: true, uptime: Math.floor(process.uptime()) }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 // ── /api/ask — all models answer in parallel ──
 app.post('/api/ask', requireAuth, rateLimit(60_000, 20), async (req, res) => {
@@ -400,6 +400,16 @@ function parseChallenges(text) {
   return result;
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 AI Arena running at http://localhost:${PORT}\n`);
+});
+
+process.on('SIGTERM', () => {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000).unref();
+});
+
+process.on('SIGINT', () => {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10_000).unref();
 });

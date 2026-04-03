@@ -2,3 +2,13 @@ node_modules
 .env
 .git
 *.log
+.devcontainer
+.claude
+.github
+.vscode
+scripts
+*.bat
+*.sh
+test-*.js
+check-styles.js
+screenshot.js

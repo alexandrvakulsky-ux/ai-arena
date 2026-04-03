@@ -1,13 +1,13 @@
-FROM node:20-slim
+FROM node:20.20.2-slim
 
 ARG TZ
 ENV TZ="$TZ"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
   curl wget ca-certificates \
-  less git procps sudo fzf zsh unzip gnupg2 gh \
+  less git procps sudo fzf zsh unzip gnupg2 gh tmux docker.io \
   iptables ipset iproute2 dnsutils aggregate jq \
-  nano \
+  nano tini \
   libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
   libdbus-1-3 libxkbcommon0 libx11-6 libxcomposite1 libxdamage1 \
   libxext6 libxfixes3 libxrandr2 libgbm1 libasound2 libatspi2.0-0 \
@@ -55,7 +55,8 @@ RUN printf '#!/bin/bash\nexec bash /workspace/.devcontainer/init-firewall.sh "$@
     printf '#!/bin/sh\niptables -P INPUT ACCEPT; iptables -P FORWARD ACCEPT; iptables -P OUTPUT ACCEPT\necho "iptables policies reset to ACCEPT"\n' \
       > /usr/local/bin/reset-iptables.sh && chmod +x /usr/local/bin/reset-iptables.sh && \
     echo 'node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh, /usr/local/bin/reset-iptables.sh, /usr/sbin/sshd' \
-      > /etc/sudoers.d/node-firewall && chmod 0440 /etc/sudoers.d/node-firewall
+      > /etc/sudoers.d/node-firewall && chmod 0440 /etc/sudoers.d/node-firewall && \
+    usermod -aG docker node || true
 
 # SSH server
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \

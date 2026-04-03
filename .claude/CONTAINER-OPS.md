@@ -1,0 +1,167 @@
+# Container Operations Runbook
+
+> This file is tracked in git and pushed to GitHub. Edit it in `/workspace/.claude/CONTAINER-OPS.md`.
+
+## SSH Access
+
+### Connecting
+```bash
+# As node user (default, runs the app)
+ssh -p 2222 node@135.181.153.92
+
+# As root (full access)
+ssh -p 2222 root@135.181.153.92
+```
+
+SSH keys must be authorized in the container. The devcontainer setup copies keys during post-create.
+
+### Troubleshooting SSH
+- **Connection refused:** SSH daemon may not be running. Check with `docker exec` from the host, then `service ssh start`.
+- **Permission denied:** Check `~/.ssh/authorized_keys` inside the container for the correct public key.
+- **Port confusion:** The container listens on port 22 internally. The Hetzner host maps 2222 -> 22. Never try to SSH on port 22 from outside.
+
+## Port Mappings
+
+| Host Port | Container Port | Service | Notes |
+|-----------|---------------|---------|-------|
+| 3000      | 3000          | Express app (AI Arena) | Main application |
+| 2222      | 22            | SSH server | For remote shell access |
+
+## Container Rebuild
+
+### When to rebuild
+- Changes to `Dockerfile`
+- Changes to `devcontainer.json`
+- Changes to `post-create.sh` (runs only on create, not restart)
+- New system packages needed
+
+### How to rebuild
+```bash
+# From the host or via Cursor:
+scripts/rebuild-container.sh
+
+# Or from Cursor: Ctrl+Shift+P -> "Dev Containers: Rebuild Container"
+```
+
+### What survives a rebuild (named volumes)
+- **Bash history** — shell history persists across rebuilds
+- **Claude config** — `~/.claude/` configuration and credentials
+- **Puppeteer cache** — Chrome/Chromium binaries for screenshot.js
+
+### What is LOST on rebuild
+- Any files outside of `/workspace` and named volumes
+- Running processes and their state
+- Installed packages not in the Dockerfile
+- Temporary files in `/tmp`
+
+**Note:** `/workspace` is bind-mounted from the host, so project files always survive.
+
+## Startup Sequence
+
+### post-create.sh (runs once on container creation)
+- Installs project dependencies (`npm install`)
+- Sets up SSH authorized keys
+- Installs Claude Code skills
+- Restores credentials from named volumes
+- Configures git identity
+
+### post-start.sh (runs on every container start)
+- Starts SSH daemon
+- Starts the application server
+- Runs any health checks
+
+## Firewall Setup
+
+The Hetzner host runs `ufw` (or equivalent) with an allowlist:
+
+- **Port 3000** — Application access (consider restricting to known IPs)
+- **Port 2222** — SSH access (restrict to your IP if possible)
+- **Port 443/80** — If reverse proxy is configured
+
+**Troubleshooting firewall:**
+```bash
+# On the Hetzner host (not inside container):
+sudo ufw status
+sudo ufw allow 2222/tcp
+sudo ufw allow 3000/tcp
+```
+
+## Zombie Process Prevention
+
+### The problem
+If PID 1 in a container is not an init system (e.g., `tail -f /dev/null`, `bash`, `node`), orphaned child processes become zombies because PID 1 never calls `wait()` to reap them.
+
+### The fix
+`devcontainer.json` includes `--init` in `runArgs`, which injects `tini` as PID 1. Tini properly reaps zombie processes.
+
+### Checking for zombies
+```bash
+# Count total processes (should be <50)
+ps aux | wc -l
+
+# Count zombies specifically
+ps aux | awk '$8 ~ /Z/' | wc -l
+
+# If zombies are accumulating, check PID 1:
+ps -p 1 -o comm=
+# Should show "tini" or "docker-init", NOT "tail" or "bash"
+```
+
+### Emergency zombie cleanup
+If zombies have accumulated and a rebuild is not immediately possible:
+```bash
+# Zombies can only be removed by killing their parent or restarting the container.
+# Find zombie parents:
+ps -eo pid,ppid,stat,comm | grep Z
+
+# Kill the parent process (if safe to do so):
+kill <parent_pid>
+```
+
+## Troubleshooting
+
+### App not responding
+```bash
+# Check if server is running
+curl -s http://localhost:3000/health
+
+# Check process
+ps aux | grep node
+
+# Restart manually
+cd /workspace && npm start &
+```
+
+### Container won't start
+1. Check Docker logs on the Hetzner host: `docker logs <container_id>`
+2. Look for errors in `devcontainer.json` (invalid JSON, bad mount paths, missing devices)
+3. If `--device=` entries reference non-existent devices, remove them
+4. Rebuild without cache: `docker build --no-cache .`
+
+### Out of disk space
+```bash
+# Inside container
+df -h
+
+# On host — prune unused Docker resources
+docker system prune -a
+```
+
+## Emergency Procedures
+
+### Container completely unresponsive
+1. SSH to Hetzner host directly: `ssh root@135.181.153.92`
+2. Find the container: `docker ps -a`
+3. Restart it: `docker restart <container_id>`
+4. If that fails, stop and start: `docker stop <id> && docker start <id>`
+
+### Need to recover from bad devcontainer.json
+1. SSH to Hetzner host
+2. Edit the file directly in the mounted workspace: `vim /path/to/workspace/.devcontainer/devcontainer.json`
+3. Fix the issue (common: bad `--device=` flags, invalid JSON)
+4. Restart the container
+
+### Application secrets lost
+1. Check Railway dashboard for environment variable values
+2. Recreate `/workspace/.env` with the keys from Railway
+3. Restart the application

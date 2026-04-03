@@ -106,6 +106,7 @@ iptables -A OUTPUT -d "$HOST_IP" -j ACCEPT
 
 # ── Lock down ──
 iptables -P INPUT DROP; iptables -P FORWARD DROP; iptables -P OUTPUT DROP
+iptables -A INPUT  -p tcp --dport 22 -j ACCEPT
 iptables -A INPUT  -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A OUTPUT -m set --match-set allowed-domains dst -j ACCEPT
