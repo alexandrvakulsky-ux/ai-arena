@@ -46,6 +46,11 @@
             "type": "command",
             "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null | grep -q '200\\|401\\|302' || { [ -f /workspace/.env ] && ! grep -q 'your-key-here\\|your-password-here' /workspace/.env && cd /workspace && nohup npm start >> /tmp/ai-arena-server.log 2>&1 & echo '{\"systemMessage\": \"Server was not running — started automatically on port 3000.\"}'; }",
             "statusMessage": "Checking server..."
+          },
+          {
+            "type": "command",
+            "command": "node /workspace/scripts/session-context.sh 2>/dev/null || echo '{\"systemMessage\": \"Session context script failed — read CLAUDE.md and .claude/sessions/ manually.\"}'",
+            "statusMessage": "Loading session context..."
           }
         ]
       }
