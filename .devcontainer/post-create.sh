@@ -113,6 +113,11 @@ done
 [ -f "$HOME/.claude/CLAUDE.md" ] || cp /workspace/.devcontainer/global-claude/CLAUDE.md "$HOME/.claude/CLAUDE.md"
 [ -f "$HOME/.claude/settings.json" ] || cp /workspace/.devcontainer/global-claude/settings.json "$HOME/.claude/settings.json"
 
+# Also set up root user's Claude config (for root SSH sessions)
+if [ -d /root/.claude ] || mkdir -p /root/.claude; then
+    [ -f /root/.claude/CLAUDE.md ] || cp /workspace/.devcontainer/global-claude/CLAUDE.md /root/.claude/CLAUDE.md 2>/dev/null || true
+fi
+
 skill_count=$(ls "$HOME/.claude/skills/"*.md 2>/dev/null | wc -l)
 echo "  [ok] $skill_count skills ready in ~/.claude/skills/"
 

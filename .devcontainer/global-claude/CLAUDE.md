@@ -2,6 +2,32 @@
 
 Applies to every project. Project-specific rules in the local .claude/CLAUDE.md override these.
 
+## FIRST THING EVERY SESSION — DO THIS BEFORE ANYTHING ELSE
+1. Read /workspace/.claude/CLAUDE.md (project rules, stack, protocols)
+2. Read /workspace/.claude/CONTAINER-OPS.md (infra, SSH, ports, troubleshooting)
+3. Read the 2-3 newest files in /workspace/.claude/sessions/ (recent conversation history)
+4. Read /workspace/.claude/rules/*.md (security, deployment, workflow)
+5. Quick health: `ps aux | wc -l` (should be <50) and `curl -s http://localhost:3000/health`
+
+IF /workspace/ IS INACCESSIBLE (container broken):
+1. All project files on GitHub: https://github.com/alexandrvakulsky-ux/ai-arena
+2. Key docs: .claude/CLAUDE.md, .claude/CONTAINER-OPS.md, .claude/sessions/
+3. Recovery: SSH to Hetzner host (135.181.153.92 port 22 as root), check `docker ps -a`
+4. Rebuild: `bash scripts/rebuild-container.sh` from host, or re-clone the repo
+5. Persistent volumes (survive rebuild): claude config, bash history, puppeteer cache
+
+## Core Principles — ALWAYS APPLY
+- Do everything yourself. Only involve Alex for critical decisions (API keys, money, destructive ops).
+- Never ask "should I do X?" if the answer is obviously yes. Just do it.
+- Document findings. Update session notes in .claude/sessions/ after significant work.
+- Keep the container clean. Watch for zombie processes, stale files, resource leaks.
+
+## PAST MISTAKES — DON'T REPEAT
+- Zombie processes: PID 1 was `tail -f /dev/null` → 1200+ zombies. Fix: --init flag in Docker.
+- GitHub auth lost on rebuild: HTTPS + no credential helper. Fix: SSH deploy key on persistent volume.
+- Claude auth lost: not backed up. Fix: two-way sync between volume and /workspace/.claude-credentials.json.
+- Session amnesia: no context between sessions. Fix: save-session.js + session-context.sh hooks.
+
 ## Who I am
 - Building AI Arena: multi-model comparison app (Claude vs GPT-4o vs Gemini)
 - Running this on Railway, developing in Cursor dev containers
