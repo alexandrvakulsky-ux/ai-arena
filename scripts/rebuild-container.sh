@@ -12,7 +12,7 @@ docker build -t "$IMAGE_NAME" "$WORKSPACE/.devcontainer"
 
 echo "=== Restarting container ==="
 docker stop "$CONTAINER_NAME" && docker rm "$CONTAINER_NAME"
-docker run -d --name "$CONTAINER_NAME" --restart unless-stopped \
+docker run -d --init --name "$CONTAINER_NAME" --restart unless-stopped \
   --cap-add=NET_ADMIN --cap-add=NET_RAW \
   -p 3000:3000 -p 2222:22 \
   -v ai-arena-bashhistory:/commandhistory \

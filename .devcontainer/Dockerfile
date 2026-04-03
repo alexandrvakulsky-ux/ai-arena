@@ -58,14 +58,17 @@ RUN printf '#!/bin/bash\nexec bash /workspace/.devcontainer/init-firewall.sh "$@
       > /etc/sudoers.d/node-firewall && chmod 0440 /etc/sudoers.d/node-firewall && \
     usermod -aG docker node || true
 
-# SSH server
+# SSH server — both node and root users get key-based access
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /run/sshd /home/node/.ssh \
+    && mkdir -p /run/sshd /home/node/.ssh /root/.ssh \
     && chown node:node /home/node/.ssh \
-    && chmod 700 /home/node/.ssh
+    && chmod 700 /home/node/.ssh /root/.ssh
 COPY --chown=node:node authorized_keys /home/node/.ssh/authorized_keys
-RUN chmod 600 /home/node/.ssh/authorized_keys && ssh-keygen -A
+COPY authorized_keys /root/.ssh/authorized_keys
+RUN chmod 600 /home/node/.ssh/authorized_keys /root/.ssh/authorized_keys \
+    && ssh-keygen -A \
+    && echo "PermitRootLogin prohibit-password" >> /etc/ssh/sshd_config
 EXPOSE 22
 
 USER node
