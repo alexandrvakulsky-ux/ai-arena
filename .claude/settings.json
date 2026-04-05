@@ -44,13 +44,17 @@
           },
           {
             "type": "command",
-            "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null | grep -q '200\\|401\\|302' || { [ -f /workspace/.env ] && ! grep -q 'your-key-here\\|your-password-here' /workspace/.env && cd /workspace && nohup npm start >> /tmp/ai-arena-server.log 2>&1 & echo '{\"systemMessage\": \"Server was not running — started automatically on port 3000.\"}'; }",
+            "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health 2>/dev/null | grep -q '200' && echo '{\"systemMessage\": \"Server: running on port 3000.\"}' || echo '{\"systemMessage\": \"WARNING: Server is NOT running. Run: cd /workspace && npm start &\"}'",
             "statusMessage": "Checking server..."
           },
           {
             "type": "command",
-            "command": "node /workspace/scripts/session-context.sh 2>/dev/null || echo '{\"systemMessage\": \"Session context script failed — read CLAUDE.md and .claude/sessions/ manually.\"}'",
+            "command": "node /workspace/scripts/session-context.js 2>/dev/null || echo '{\"systemMessage\": \"Session context script failed — read CLAUDE.md and .claude/sessions/ manually.\"}'",
             "statusMessage": "Loading session context..."
+          },
+          {
+            "type": "command",
+            "command": "bash /workspace/scripts/save-session-loop.sh &>/dev/null &"
           }
         ]
       }
@@ -93,15 +97,6 @@
             "type": "command",
             "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
             "statusMessage": "Checking skill triggers..."
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node /workspace/scripts/save-session.js 2>/dev/null || true",
-            "async": true
           }
         ]
       }

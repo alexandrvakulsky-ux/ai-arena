@@ -1,3 +1,6 @@
 node_modules/
 .env
 .claude-credentials.json
+*.log
+.DS_Store
+npm-debug.log*

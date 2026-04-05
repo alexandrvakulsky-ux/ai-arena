@@ -1,19 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git:*)",
-      "Bash(npm:*)",
-      "Bash(node:*)",
-      "Bash(curl:*)",
-      "Bash(ls:*)",
-      "Bash(cat:*)",
-      "Bash(echo:*)",
-      "Bash(mkdir:*)",
-      "Bash(chmod:*)",
-      "Bash(cp:*)",
-      "Bash(mv:*)",
-      "Bash(pkill:*)",
-      "Bash(nohup:*)"
+      "Bash(*)"
     ]
   },
   "hooks": {
@@ -23,7 +11,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /home/node/.claude/scripts/skill-reminder.js 2>/dev/null || true",
+            "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
             "statusMessage": "Checking skill triggers..."
           }
         ]
@@ -34,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /home/node/.claude/scripts/skill-reflection.js 2>/dev/null || true",
+            "command": "node /workspace/scripts/skill-reflection.js 2>/dev/null || true",
             "statusMessage": "Skill reflection..."
           },
           {

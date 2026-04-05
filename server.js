@@ -12,7 +12,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.setHeader(
     'Content-Security-Policy',
@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '32kb' }));
+app.use('/api/transcribe', express.raw({ type: 'audio/*', limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT         = process.env.PORT || 3000;
@@ -399,6 +400,38 @@ function parseChallenges(text) {
   }
   return result;
 }
+
+// ── /api/transcribe — voice → text via OpenAI Whisper ──
+app.post('/api/transcribe', requireAuth, rateLimit(60_000, 20), async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!req.body || !req.body.length) return res.status(400).json({ error: 'No audio data received' });
+
+  const boundary = '----FormBoundary' + crypto.randomBytes(8).toString('hex');
+  const fieldHeader = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.webm"\r\nContent-Type: audio/webm\r\n\r\n`;
+  const modelField = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n--${boundary}--\r\n`;
+
+  const formBody = Buffer.concat([
+    Buffer.from(fieldHeader),
+    req.body,
+    Buffer.from(modelField),
+  ]);
+
+  try {
+    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      body: formBody,
+    });
+    const data = await whisperRes.json();
+    if (data.error) return res.status(500).json({ error: data.error.message || 'Whisper API error' });
+    res.json({ text: data.text });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const server = app.listen(PORT, () => {
   console.log(`\n🚀 AI Arena running at http://localhost:${PORT}\n`);

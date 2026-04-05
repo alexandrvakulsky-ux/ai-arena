@@ -95,13 +95,10 @@ for name in brainstorming systematic-debugging verification-before-completion \
     [ -f "$HOME/.claude/skills/${name}.md" ] || { [ -f "$f" ] && cp "$f" "$HOME/.claude/skills/${name}.md"; }
 done
 
-# Copy custom skills, scripts, agents from workspace backup (never overwrite)
+# Copy custom skills and agents from workspace backup (never overwrite)
+# Scripts live in /workspace/scripts/ (single source of truth) — no copy needed.
 for f in /workspace/.devcontainer/global-claude/skills/*.md; do
     dst="$HOME/.claude/skills/$(basename $f)"
-    [ -f "$dst" ] || cp "$f" "$dst"
-done
-for f in /workspace/.devcontainer/global-claude/scripts/*.js; do
-    dst="$HOME/.claude/scripts/$(basename $f)"
     [ -f "$dst" ] || cp "$f" "$dst"
 done
 for f in /workspace/.devcontainer/global-claude/agents/*.md; do

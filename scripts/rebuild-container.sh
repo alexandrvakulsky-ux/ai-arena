@@ -21,6 +21,6 @@ docker run -d --init --name "$CONTAINER_NAME" --restart unless-stopped \
   -v "$WORKSPACE":/workspace \
   -v /var/run/docker.sock:/var/run/docker.sock \
   "$IMAGE_NAME" \
-  bash -c "bash /workspace/.devcontainer/post-create.sh; bash /workspace/.devcontainer/post-start.sh; tail -f /dev/null"
+  bash -c "bash /workspace/.devcontainer/post-create.sh; bash /workspace/.devcontainer/post-start.sh; sleep infinity"
 
 echo "=== Done. Container restarted. SSH back in with: ssh hetzner-container ==="

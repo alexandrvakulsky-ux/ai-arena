@@ -11,20 +11,7 @@ sudo /usr/sbin/sshd -o "UsePAM yes" || echo "sshd failed to start"
 # Keep global CLAUDE.md in sync from repo (source of truth) for both users
 if [ -f /workspace/.devcontainer/global-claude/CLAUDE.md ]; then
     cp /workspace/.devcontainer/global-claude/CLAUDE.md "$HOME/.claude/CLAUDE.md" 2>/dev/null || true
-    sudo cp /workspace/.devcontainer/global-claude/CLAUDE.md /root/.claude/CLAUDE.md 2>/dev/null || true
 fi
-
-# Zombie reaper safety net: periodically wait for orphaned children
-# This helps even if --init is not available (e.g., older Docker versions)
-(while true; do
-  sleep 300
-  # Log zombie count for monitoring
-  ZOMBIE_COUNT=$(ps -eo stat | grep -c '^Z' 2>/dev/null || echo 0)
-  if [ "$ZOMBIE_COUNT" -gt 0 ]; then
-    echo "$(date): $ZOMBIE_COUNT zombie processes detected" >> /tmp/zombie-reaper.log
-  fi
-done) &
-disown
 
 # GitHub SSH key — stored on persistent volume, symlinked on every start
 if [ -f "$HOME/.claude/github-deploy-key" ]; then
@@ -84,6 +71,9 @@ fi
     fi
 done) &
 disown
+
+# Root Claude setup: credentials, settings, and bypass-permissions wrapper
+sudo /usr/local/bin/setup-root-claude.sh || echo "Root Claude setup skipped (script not found or failed)"
 
 # Auto-start Claude Code in a persistent tmux session (enables mobile remote control)
 export PATH=$PATH:/usr/local/share/npm-global/bin
