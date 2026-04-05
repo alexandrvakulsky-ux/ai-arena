@@ -1,18 +1,60 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash(*)"
+      "Bash(*)",
+      "Skill(schedule)",
+      "Skill(schedule:*)",
+      "Read(//etc/**)",
+      "Read(//usr/local/share/npm-global/**)",
+      "Read(//usr/local/lib/node_modules/**)",
+      "Read(//usr/lib/**)",
+      "Read(//usr/bin/**)",
+      "Read(//home/node/.cache/**)"
+    ],
+    "additionalDirectories": [
+      "/home/node/.claude",
+      "/home/node/.claude/projects/-workspace/memory",
+      "/tmp"
     ]
   },
+  "mcpServers": {
+    "puppeteer": {
+      "command": "node",
+      "args": [
+        "/usr/local/share/npm-global/lib/node_modules/@modelcontextprotocol/server-puppeteer/dist/index.js"
+      ],
+      "env": {
+        "PUPPETEER_LAUNCH_ARGS": "--no-sandbox --disable-setuid-sandbox"
+      }
+    }
+  },
   "hooks": {
-    "PostToolUse": [
+    "SessionStart": [
       {
-        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
-            "statusMessage": "Checking skill triggers..."
+            "command": "git pull 2>/dev/null || true",
+            "statusMessage": "Pulling latest changes..."
+          },
+          {
+            "type": "command",
+            "command": "[ ! -f .env ] && echo '{\"systemMessage\": \"WARNING: .env file is missing! Copy your API keys (.env) before running the server.\"}' || true"
+          },
+          {
+            "type": "command",
+            "command": "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health 2>/dev/null | grep -q '200' && echo '{\"systemMessage\": \"Server: running on port 3000.\"}' || echo '{\"systemMessage\": \"WARNING: Server is NOT running. Run: cd /workspace && npm start &\"}'",
+            "statusMessage": "Checking server..."
+          },
+          {
+            "type": "command",
+            "command": "node /workspace/scripts/session-context.js 2>/dev/null || echo '{\"systemMessage\": \"Session context script failed — read CLAUDE.md and .claude/sessions/ manually.\"}'",
+            "statusMessage": "Loading session context..."
+          },
+          {
+            "type": "command",
+            "command": "bash /workspace/scripts/save-session-loop.sh &>/dev/null &"
           }
         ]
       }
@@ -22,13 +64,39 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /workspace/scripts/skill-reflection.js 2>/dev/null || true",
-            "statusMessage": "Skill reflection..."
+            "command": "node /workspace/scripts/save-session.js",
+            "statusMessage": "Saving session history..."
+          },
+          {
+            "type": "command",
+            "command": "[ -f \"$HOME/.claude/.credentials.json\" ] && cp \"$HOME/.claude/.credentials.json\" /workspace/.claude-credentials.json && chmod 600 /workspace/.claude-credentials.json || true",
+            "statusMessage": "Backing up credentials..."
           },
           {
             "type": "command",
             "command": "printf '\\a'",
             "statusMessage": "Done."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /workspace/scripts/extract-file-path.js | { read -r f; [ -n \"$f\" ] && bash /workspace/scripts/commit-with-devcontainer-guard.sh \"$f\"; [ -n \"$f\" ] && bash /workspace/scripts/auto-restart-server.sh \"$f\"; } 2>/dev/null || true",
+            "statusMessage": "Committing and restarting if needed..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
+            "statusMessage": "Checking skill triggers..."
           }
         ]
       }

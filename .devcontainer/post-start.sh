@@ -8,9 +8,12 @@ sudo /usr/local/bin/init-firewall.sh || echo "Firewall init failed -- container 
 # SSH daemon — run with -o to clean up finished sessions
 sudo /usr/sbin/sshd -o "UsePAM yes" || echo "sshd failed to start"
 
-# Keep global CLAUDE.md in sync from repo (source of truth) for both users
+# Keep global config in sync from repo (source of truth)
 if [ -f /workspace/.devcontainer/global-claude/CLAUDE.md ]; then
     cp /workspace/.devcontainer/global-claude/CLAUDE.md "$HOME/.claude/CLAUDE.md" 2>/dev/null || true
+fi
+if [ -f /workspace/.devcontainer/global-claude/settings.json ]; then
+    cp /workspace/.devcontainer/global-claude/settings.json "$HOME/.claude/settings.json" 2>/dev/null || true
 fi
 
 # GitHub SSH key — stored on persistent volume, symlinked on every start
