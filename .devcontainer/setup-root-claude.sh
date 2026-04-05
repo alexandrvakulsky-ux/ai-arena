@@ -50,6 +50,18 @@ fi
 cp /home/node/.claude/settings.json /root/.claude/settings.json 2>/dev/null || true
 cp /home/node/.claude/CLAUDE.md /root/.claude/CLAUDE.md 2>/dev/null || true
 
+# Git identity for root (auto-commit hooks need this)
+git config --global user.name "alexandrvakulsky-ux"
+git config --global user.email "alexandr.vakulsky@gmail.com"
+# SSH key for git push
+if [ -f /home/node/.claude/github-deploy-key ]; then
+    mkdir -p /root/.ssh
+    cp /home/node/.claude/github-deploy-key /root/.ssh/github-deploy-key
+    chmod 600 /root/.ssh/github-deploy-key
+    ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
+    git config --global core.sshCommand "ssh -i /root/.ssh/github-deploy-key -o StrictHostKeyChecking=accept-new"
+fi
+
 # 2. Wrap any existing CLI binaries
 wrap_cli_binaries() {
     [ -d /root/.claude/remote/ccd-cli ] || return 0
