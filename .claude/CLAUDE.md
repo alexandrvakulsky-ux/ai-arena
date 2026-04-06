@@ -7,6 +7,7 @@ On every new session start:
 1. Read this file (CLAUDE.md) and all files in .claude/rules/
 2. Read .claude/CONTAINER-OPS.md for infrastructure context
 3. Check recent session notes in .claude/sessions/ (latest 2-3 files)
+   - If stuck on infra/container/auth issues, read `docs/PROJECT-HISTORY.md` — has 20 solved problems with fixes
 4. Run `ps aux | wc -l` to check process health (should be <50, if >100 investigate zombies)
 5. Verify server is running: `curl -s http://localhost:3000/health`
 6. Act autonomously - only escalate to user for truly critical decisions (API key changes, destructive operations, architectural changes)

@@ -32,6 +32,7 @@ Tell Alex: "I need access to https://github.com/alexandrvakulsky-ux/ai-arena to 
 - **Rules**: `.claude/rules/` (security.md, deployment.md, workflow.md)
 - **Container setup**: `.devcontainer/` (Dockerfile, post-create.sh, post-start.sh)
 - **Scripts**: `scripts/` (rebuild-container.sh, new-machine-setup.sh, etc.)
+- **Engineering log**: `docs/PROJECT-HISTORY.md` (20 hardest problems solved, architecture decisions, persistence model — read this when stuck on infra/container/auth issues)
 
 ## INFRASTRUCTURE QUICK REFERENCE
 - **Hetzner VPS**: 135.181.153.92
