@@ -22,10 +22,20 @@ SSH keys must be authorized in the container. The devcontainer setup copies keys
 
 ## Port Mappings
 
+### AI Arena container (`ai-arena`)
 | Host Port | Container Port | Service | Notes |
 |-----------|---------------|---------|-------|
 | 3000      | 3000          | Express app (AI Arena) | Main application |
 | 2222      | 22            | SSH server | For remote shell access |
+
+### Ad Spy container (`ad-spy`)
+| Host Port | Container Port | Service | Notes |
+|-----------|---------------|---------|-------|
+| 3001      | 3001          | Express app (Ad Spy) | Facebook Ad Library intelligence |
+| 2223      | 22            | SSH server | For remote shell access |
+
+Ad Spy workspace bind mount: `/srv/ad-spy` → `/workspace`
+Puppeteer cache volume: `ad-spy-puppeteer-cache`
 
 ## Container Rebuild
 
@@ -74,8 +84,10 @@ scripts/rebuild-container.sh
 
 The Hetzner host runs `ufw` (or equivalent) with an allowlist:
 
-- **Port 3000** — Application access (consider restricting to known IPs)
-- **Port 2222** — SSH access (restrict to your IP if possible)
+- **Port 3000** — AI Arena (consider restricting to known IPs)
+- **Port 3001** — Ad Spy
+- **Port 2222** — SSH to AI Arena container
+- **Port 2223** — SSH to Ad Spy container
 - **Port 443/80** — If reverse proxy is configured
 
 **Troubleshooting firewall:**
@@ -120,16 +132,19 @@ kill <parent_pid>
 
 ## Troubleshooting
 
-### App not responding
+### AI Arena not responding
 ```bash
-# Check if server is running
 curl -s http://localhost:3000/health
-
-# Check process
 ps aux | grep node
-
-# Restart manually
 cd /workspace && npm start &
+```
+
+### Ad Spy not responding
+```bash
+# From the Hetzner host or ai-arena container:
+docker exec ad-spy curl -s http://localhost:3001/health
+docker exec ad-spy cat /workspace/server.log | tail -20
+docker restart ad-spy
 ```
 
 ### Container won't start

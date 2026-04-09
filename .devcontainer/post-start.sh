@@ -5,8 +5,20 @@ set -euo pipefail
 # Firewall
 sudo /usr/local/bin/init-firewall.sh || echo "Firewall init failed -- container still usable. Run: sudo /usr/local/bin/init-firewall.sh"
 
-# SSH daemon — run with -o to clean up finished sessions
-sudo /usr/sbin/sshd -o "UsePAM yes" || echo "sshd failed to start"
+# SSH daemon — run with watchdog so it auto-restarts if it crashes
+_start_sshd() {
+    sudo /usr/sbin/sshd -o "UsePAM yes" || echo "sshd failed to start"
+}
+_start_sshd
+# Watchdog: restart sshd within 5s if it dies
+(while true; do
+    sleep 5
+    if ! pgrep -f 'sshd.*listener' > /dev/null 2>&1; then
+        echo "[watchdog] sshd died, restarting..." >&2
+        _start_sshd
+    fi
+done) &
+disown
 
 # Keep global config in sync from repo (source of truth)
 if [ -f /workspace/.devcontainer/global-claude/CLAUDE.md ]; then

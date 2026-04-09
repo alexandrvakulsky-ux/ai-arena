@@ -107,11 +107,12 @@ iptables -A OUTPUT -d "$HOST_IP" -j ACCEPT
 # ── Lock down ──
 iptables -P INPUT DROP; iptables -P FORWARD DROP; iptables -P OUTPUT DROP
 
-# SSH brute-force protection: 3 new connections per 60s, then progressive ban
+# SSH brute-force protection: track new connections, drop after 20 per 60s
+# (threshold is 20 to accommodate desktop app reconnect loops)
 # Track new SSH connections
 iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --set --name sshbrute
-# Drop if more than 3 attempts in 60 seconds (first ban: 60s)
-iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 4 --name sshbrute -j DROP
+# Drop if more than 20 new connections in 60 seconds
+iptables -A INPUT -p tcp --dport 22 -m state --state NEW -m recent --update --seconds 60 --hitcount 20 --name sshbrute -j DROP
 # Allow legit SSH
 iptables -A INPUT  -p tcp --dport 22 -j ACCEPT
 iptables -A INPUT  -m state --state ESTABLISHED,RELATED -j ACCEPT
