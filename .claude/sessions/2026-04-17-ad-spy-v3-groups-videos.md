@@ -119,4 +119,6 @@ Video URL coverage went from 35/58 video ads (60%) on initial check; all missing
 - No way yet to batch-remove competitors from a group via UI (remove button exists on Discover tab only, per-page)
 
 ## Infra Note
-Ad Spy container does not have its own git repo. Source code is now copied into `ai-arena/ad-spy/` for versioning alongside the main project. To deploy: `docker cp ai-arena/ad-spy/*.js ad-spy:/workspace/ && docker restart ad-spy`.
+Ad Spy has its own GitHub repo: `git@github.com:alexandrvakulsky-ux/ad-spy.git`. The ad-spy container at `/workspace` is a git clone with its own SSH deploy key (`~/.ssh/github-deploy-key`). Commit + push from inside the container. The host path `/srv/ad-spy` is bind-mounted into the container, so edits made on the host are immediately visible inside — but commits must happen from inside the container (that's where the git repo lives). This session's changes pushed as commit `8b4b582`.
+
+**Remember for next time:** Always check `CONTAINER-OPS.md` for repo URLs before assuming none exists. Don't dump source into the ai-arena repo — each container has its own repo.

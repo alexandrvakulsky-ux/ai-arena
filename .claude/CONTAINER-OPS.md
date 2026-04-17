@@ -36,6 +36,7 @@ SSH keys must be authorized in the container. The devcontainer setup copies keys
 
 Ad Spy workspace bind mount: `/srv/ad-spy` → `/workspace`
 Puppeteer cache volume: `ad-spy-puppeteer-cache`
+**Repo:** `git@github.com:alexandrvakulsky-ux/ad-spy.git` — the ad-spy container has its own git clone at `/workspace` with SSH deploy key at `~/.ssh/github-deploy-key`. To commit changes: `docker exec ad-spy sh -c "cd /workspace && git add <files> && git commit -m '...' && git push"`. Source files to deploy live on host at `/srv/ad-spy/` (bind-mounted) — after editing on host, copy into container with `docker cp` and then commit from inside.
 
 ## Container Rebuild
 
