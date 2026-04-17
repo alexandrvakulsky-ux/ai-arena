@@ -64,6 +64,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash /workspace/.claude/hooks/invariants.sh",
+            "statusMessage": "Checking regression invariants..."
+          },
+          {
+            "type": "command",
             "command": "node /workspace/scripts/save-session.js",
             "statusMessage": "Saving session history..."
           },
@@ -97,6 +102,18 @@
             "type": "command",
             "command": "node /workspace/scripts/skill-reminder.js 2>/dev/null || true",
             "statusMessage": "Checking skill triggers..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/.claude/hooks/pre-destructive.sh",
+            "statusMessage": "Checking docs before destructive operation..."
           }
         ]
       }
