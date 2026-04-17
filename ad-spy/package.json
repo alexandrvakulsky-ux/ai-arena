@@ -1,0 +1,18 @@
+{
+  "name": "ad-spy",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Alexandr Vakulsky",
+  "license": "UNLICENSED",
+  "private": true,
+  "description": "Facebook Ad Library intelligence tool — track competitor ads, discover new competitors, cache creatives",
+  "dependencies": {
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "node-fetch": "^2.7.0",
+    "puppeteer": "^24.40.0"
+  }
+}

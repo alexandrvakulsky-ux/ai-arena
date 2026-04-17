@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ad Spy</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0c0d10; --surface: #111318; --raised: #16181e; --border: rgba(255,255,255,0.06); --border-s: rgba(255,255,255,0.1); --text: #ececf1; --muted: #9ca3af; --dim: #71717a; --accent: #6366f1; --green: #34d399; --orange: #fb923c; --blue: #38bdf8; --red: #f87171; --font: "Inter",system-ui,sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.5; height: 100vh; overflow: hidden; }
+  .layout { display: flex; height: 100vh; }
+
+  .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+  .sidebar-header h1 { font-size: 15px; font-weight: 700; }
+  .badge { font-size: 9px; padding: 1px 5px; border-radius: 999px; background: rgba(99,102,241,0.15); color: var(--accent); border: 1px solid rgba(99,102,241,0.25); }
+  .sidebar-list { flex: 1; overflow-y: auto; padding: 6px; }
+  .comp-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .comp-item:hover { background: var(--raised); }
+  .comp-item.active { background: rgba(99,102,241,0.1); color: var(--accent); }
+  .comp-count { font-size: 11px; color: var(--dim); }
+  .comp-item.active .comp-count { color: var(--accent); }
+  .comp-item.sub { padding-left: 22px; font-size: 12px; color: var(--muted); }
+  .comp-item.sub:not(.active) .comp-count { color: var(--dim); }
+
+  .group-section { margin-bottom: 8px; }
+  .group-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 6px; font-size: 10px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; border-radius: 5px; }
+  .group-header:hover { color: var(--muted); }
+  .group-header .caret { transition: transform 0.15s; font-size: 10px; }
+  .group-section.collapsed .caret { transform: rotate(-90deg); }
+  .group-section.collapsed .group-body { display: none; }
+  .group-count { font-size: 10px; color: var(--dim); font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .sidebar-footer { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 10px; color: var(--dim); }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .tabs { display: flex; gap: 2px; background: var(--surface); border-radius: 7px; padding: 2px; border: 1px solid var(--border); }
+  .tab { padding: 5px 14px; font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; border-radius: 5px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--raised); color: var(--text); }
+  .topbar-right { display: flex; gap: 6px; align-items: center; }
+  .topbar-right button { padding: 5px 10px; background: var(--raised); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-family: var(--font); font-size: 11px; cursor: pointer; }
+  .topbar-right button:hover { color: var(--text); border-color: var(--border-s); }
+
+  .stats-bar { display: flex; gap: 16px; padding: 8px 16px; font-size: 11px; color: var(--dim); border-bottom: 1px solid var(--border); }
+  .stats-bar .val { color: var(--text); font-weight: 600; }
+
+  .content { flex: 1; overflow-y: auto; padding: 16px; }
+  .ad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+
+  .loading { text-align: center; padding: 60px; color: var(--dim); }
+  .loading-more { text-align: center; padding: 20px; color: var(--dim); font-size: 12px; }
+  .empty { text-align: center; padding: 60px; color: var(--dim); }
+  .empty h2 { font-size: 16px; color: var(--muted); margin-bottom: 6px; }
+
+  .ad-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .ad-card:hover { border-color: var(--border-s); }
+
+  .fb-top { background: #fff; }
+  .fb-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
+  .fb-avatar { width: 36px; height: 36px; border-radius: 50%; background: #e4e6eb; flex-shrink: 0; object-fit: cover; }
+  .fb-page-info { flex: 1; min-width: 0; }
+  .fb-page-name { font-size: 13px; font-weight: 600; color: #050505; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fb-sponsored { font-size: 11px; color: #65676b; }
+  .fb-body { padding: 4px 12px 8px; font-size: 13px; color: #050505; line-height: 1.4; }
+  .fb-body.clamped { max-height: 90px; overflow: hidden; cursor: pointer; }
+
+  .fb-img { position: relative; width: 100%; padding-top: 100%; background: var(--raised); overflow: hidden; }
+  .fb-img img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+  .fb-img .no-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 12px; background: var(--raised); text-decoration: none; font-weight: 500; }
+  .fb-img .no-img:hover { background: rgba(99,102,241,0.1); }
+
+  .play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 56px; height: 56px; border-radius: 50%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; border: 2px solid rgba(255,255,255,0.3); transition: all 0.15s; }
+  .play-btn:hover { background: rgba(0,0,0,0.85); border-color: rgba(255,255,255,0.6); transform: translate(-50%,-50%) scale(1.08); }
+  .play-btn svg { width: 22px; height: 22px; fill: #fff; margin-left: 3px; }
+  .fb-img video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+
+  .fb-cta { display: flex; align-items: center; padding: 8px 12px; background: #f0f2f5; overflow: hidden; }
+  .fb-cta-domain { font-size: 11px; color: #65676b; text-transform: uppercase; }
+  .fb-cta-title { font-size: 13px; font-weight: 600; color: #050505; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .card-foot { padding: 10px 12px 8px; }
+  .card-foot-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .card-comp { font-size: 13px; font-weight: 600; color: var(--text); }
+  .dur { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+  .dur.hot { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.18); }
+  .dur.warm { background: rgba(251,146,60,0.1); color: var(--orange); border: 1px solid rgba(251,146,60,0.18); }
+  .dur.new { background: rgba(99,102,241,0.1); color: var(--accent); border: 1px solid rgba(99,102,241,0.18); }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--raised); color: var(--dim); border: 1px solid var(--border); }
+  .tag.pl { color: var(--blue); background: rgba(56,189,248,0.06); border-color: rgba(56,189,248,0.12); }
+
+  .angle-zone { padding: 10px 12px; background: rgba(99,102,241,0.04); border-bottom: 1px solid var(--border); }
+  .angle-row { display: flex; align-items: center; justify-content: space-between; }
+  .angle-left { display: flex; align-items: center; gap: 8px; }
+  .angle-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .angle-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+  .angle-status.scaling { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+  .angle-status.proven { background: rgba(52,211,153,0.1); color: var(--green); border: 1px solid rgba(52,211,153,0.18); }
+  .angle-status.testing { background: rgba(251,146,60,0.1); color: var(--orange); border: 1px solid rgba(251,146,60,0.18); }
+  .angle-status.generic { background: var(--raised); color: var(--dim); border: 1px solid var(--border); }
+  .angle-velocity { font-size: 13px; font-weight: 500; color: var(--muted); }
+
+  .card-actions { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .card-actions .spacer { flex: 1; }
+  .lib-link { font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 500; padding: 3px 10px; border: 1px solid rgba(99,102,241,0.2); border-radius: 5px; background: transparent; transition: background 0.15s; }
+  .lib-link:hover { background: rgba(99,102,241,0.1); }
+
+  #gate { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 1000; }
+  .gate-box { background: var(--raised); border: 1px solid var(--border); border-radius: 10px; padding: 28px 24px; width: 100%; max-width: 340px; text-align: center; }
+  .gate-box h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .gate-box p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+  .gate-box input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; color: var(--text); font-family: var(--font); font-size: 14px; text-align: center; outline: none; margin-bottom: 10px; }
+  .gate-box button { width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-family: var(--font); font-size: 14px; font-weight: 500; cursor: pointer; }
+  .gate-error { font-size: 12px; color: var(--red); min-height: 16px; margin-bottom: 8px; }
+
+  /* Discover tab */
+  .discover-wrap { width: 100%; }
+  .search-bar { display: flex; gap: 8px; margin-bottom: 20px; }
+  .search-bar input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text); font-family: var(--font); font-size: 14px; outline: none; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar button { padding: 10px 20px; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .search-bar button:disabled { opacity: 0.5; cursor: default; }
+  .search-meta { font-size: 11px; color: var(--dim); margin-bottom: 16px; }
+  .disc-table { width: 100%; border-collapse: collapse; }
+  .disc-table th { text-align: left; font-size: 10px; text-transform: uppercase; color: var(--dim); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .disc-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .disc-table tr:hover { background: var(--raised); }
+  .disc-name { font-weight: 600; font-size: 13px; }
+  .disc-count { font-size: 16px; font-weight: 700; color: var(--green); }
+  .disc-platforms { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px; }
+  .disc-sample { font-size: 11px; color: var(--muted); margin-top: 4px; max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+  .disc-row.open .disc-sample { max-height: 200px; }
+  .disc-row { cursor: pointer; }
+  .disc-stats { font-size: 11px; color: var(--dim); }
+  .track-btn { padding: 4px 12px; border-radius: 5px; font-size: 11px; font-weight: 600; font-family: var(--font); cursor: pointer; border: none; }
+  .track-btn.add { background: var(--accent); color: #fff; }
+  .track-btn.add:hover { opacity: 0.85; }
+  .track-btn.tracked { background: transparent; color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+  .track-btn.remove { background: transparent; color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+  .suggest-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip { padding: 4px 10px; background: var(--raised); border: 1px solid var(--border); border-radius: 999px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--font); }
+  .chip:hover { color: var(--text); border-color: var(--border-s); }
+</style>
+</head>
+<body>
+<div id="gate">
+  <div class="gate-box">
+    <h2>Ad Spy</h2>
+    <p>Enter password to continue</p>
+    <input type="password" id="pwInput" placeholder="Password" onkeydown="if(event.key==='Enter')checkPw()">
+    <div class="gate-error" id="pwError"></div>
+    <button onclick="checkPw()">Enter</button>
+  </div>
+</div>
+
+<div class="layout" id="app" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-header"><h1>Ad Spy</h1><span class="badge">v2</span></div>
+    <div class="sidebar-list" id="compList"></div>
+    <div class="sidebar-footer" id="sidebarFooter"></div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="tabs">
+        <div class="tab active" id="tabNew" onclick="switchTab('new')">New Ads</div>
+        <div class="tab" id="tabDiscover" onclick="switchTab('discover')">Discover</div>
+      </div>
+      <div class="topbar-right"></div>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="content" id="content">
+      <div class="loading">Loading ads...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const T = 'adspy_token';
+let token = sessionStorage.getItem(T) || '';
+let currentTab = 'new';
+let currentComp = null;
+let currentGroup = null;  // when set and currentComp is null, filter by group only
+let competitors = [];
+let groups = [];
+let lastCompCounts = {};
+let lastGroupCounts = {};
+let collapsedGroups = JSON.parse(localStorage.getItem('adspy_collapsed_groups') || '[]');
+
+// ── Pagination state ──
+let currentPage = 0;
+let hasMore = false;
+let isLoading = false;
+let prefetchedNext = null;  // holds {ads, page, has_more} for next page
+let cardIndex = 0;
+
+function h(t) { return t ? (t+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+function api(url, opts) { return fetch(url, { ...opts, headers: { ...opts?.headers, 'x-app-token': token } }); }
+
+// ── Intersection Observer for lazy-loading images ──
+// Initialized after DOM ready — root must be the scroll container, not viewport
+let imgObserver = null;
+function initImgObserver() {
+  const scrollRoot = document.getElementById('content');
+  imgObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const img = entry.target;
+      if (img.dataset.src) {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+      }
+      imgObserver.unobserve(img);
+    });
+  }, { root: scrollRoot, rootMargin: '600px 0px', threshold: 0 });
+
+}
+
+// ── Sentinel observer for infinite scroll ──
+let sentinelObserver = null;
+
+function setupSentinel() {
+  const sentinel = document.getElementById('sentinel');
+  if (!sentinel) return;
+  if (sentinelObserver) sentinelObserver.disconnect();
+  sentinelObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && hasMore && !isLoading) loadNextPage();
+  }, { root: document.getElementById('content'), rootMargin: '600px 0px' });
+  sentinelObserver.observe(sentinel);
+}
+
+// ── Auth ──
+function init() {
+  api('/api/verify').then(r => { if (r.ok) unlock(); });
+}
+
+async function checkPw() {
+  const v = document.getElementById('pwInput').value;
+  if (!v) { document.getElementById('pwError').textContent = 'Enter a password.'; return; }
+  const r = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: v }) });
+  const d = await r.json();
+  if (d.ok) { token = d.token; sessionStorage.setItem(T, token); unlock(); }
+  else document.getElementById('pwError').textContent = d.error || 'Wrong password.';
+}
+
+function unlock() {
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  initImgObserver();
+  loadCompetitors();
+  loadAds();
+}
+
+async function loadCompetitors() {
+  const r = await api('/api/competitors');
+  const d = await r.json();
+  competitors = d.competitors;
+  groups = d.groups && d.groups.length ? d.groups : ['Digital Security'];
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('compList');
+  const counts = lastCompCounts || {};
+  const gCounts = lastGroupCounts || {};
+  const totalAds = Object.values(counts).reduce((s, n) => s + n, 0);
+  const isAll = !currentComp && !currentGroup;
+
+  let html = `<div class="comp-item ${isAll ? 'active' : ''}" onclick="selectAll()"><span>All Competitors</span><span class="comp-count">${totalAds || ''}</span></div>`;
+
+  for (const g of groups) {
+    const collapsed = collapsedGroups.includes(g);
+    const inGroup = competitors.filter(c => (c.group || 'Digital Security') === g);
+    const groupTotal = gCounts[g] || 0;
+    const groupActive = !currentComp && currentGroup === g;
+    html += `<div class="group-section ${collapsed ? 'collapsed' : ''}" data-group="${h(g)}">
+      <div class="group-header" onclick="toggleGroup('${h(g)}')">
+        <span><span class="caret">▼</span> ${h(g)}</span>
+        <span class="group-count">${groupTotal || ''}</span>
+      </div>
+      <div class="group-body">
+        <div class="comp-item sub ${groupActive ? 'active' : ''}" onclick="selectGroup('${h(g)}')"><span>All in ${h(g)}</span><span class="comp-count">${groupTotal || ''}</span></div>`;
+    for (const c of inGroup) {
+      const cnt = counts[c.name] || 0;
+      html += `<div class="comp-item sub ${currentComp === c.name ? 'active' : ''}" onclick="selectComp('${h(c.name)}')"><span>${h(c.name)}</span><span class="comp-count">${cnt || ''}</span></div>`;
+    }
+    if (inGroup.length === 0) {
+      html += `<div class="comp-item sub" style="color:var(--dim);font-style:italic;cursor:default">No competitors yet</div>`;
+    }
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function toggleGroup(g) {
+  const i = collapsedGroups.indexOf(g);
+  if (i >= 0) collapsedGroups.splice(i, 1); else collapsedGroups.push(g);
+  localStorage.setItem('adspy_collapsed_groups', JSON.stringify(collapsedGroups));
+  renderSidebar();
+}
+
+function selectAll() { currentComp = null; currentGroup = null; renderSidebar(); loadAds(); }
+function selectGroup(g) { currentComp = null; currentGroup = g; renderSidebar(); loadAds(); }
+function selectComp(name) {
+  currentComp = name;
+  const c = competitors.find(x => x.name === name);
+  currentGroup = c ? (c.group || 'Digital Security') : null;
+  renderSidebar();
+  loadAds();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabNew').classList.toggle('active', tab === 'new');
+  document.getElementById('tabDiscover').classList.toggle('active', tab === 'discover');
+  if (tab === 'discover') { renderDiscover(); return; }
+  loadAds();
+}
+
+function renderStats(s) {
+  if (!s) { document.getElementById('statsBar').innerHTML = ''; return; }
+  document.getElementById('statsBar').innerHTML = `
+    <span><span class="val">${s.total}</span> ads</span>
+    <span><span class="val">${s.active || 0}</span> active</span>
+    ${s.avg_score ? `<span>avg score: <span class="val">${s.avg_score}</span></span>` : ''}
+    ${s.top_score ? `<span>top: <span class="val">${s.top_score}</span></span>` : ''}
+    ${s.new_last_7d !== undefined ? `<span><span class="val">${s.new_last_7d}</span> this week</span>` : ''}`;
+  document.getElementById('sidebarFooter').textContent = `${competitors.length} competitors · ${s.total} ads`;
+}
+
+// ── Build the URL for current filters ──
+function buildUrl(page) {
+  const params = new URLSearchParams({ sort: 'score', page, limit: 50, active_only: 'true' });
+  if (currentComp) params.set('competitor', currentComp);
+  else if (currentGroup) params.set('group', currentGroup);
+  return `/api/ads/new?${params}`;
+}
+
+// ── Initial load — fetch page 1, render grid + sentinel ──
+async function loadAds() {
+  // Reset state
+  currentPage = 0;
+  hasMore = false;
+  isLoading = true;
+  prefetchedNext = null;
+  cardIndex = 0;
+  if (sentinelObserver) sentinelObserver.disconnect();
+
+  document.getElementById('content').innerHTML = '<div class="loading">Loading...</div>';
+
+  try {
+    const r = await api(buildUrl(1));
+    if (r.status === 401) { sessionStorage.removeItem(T); location.reload(); return; }
+    const d = await r.json();
+    if (d.error) { document.getElementById('content').innerHTML = `<div class="empty"><h2>Error</h2><p>${h(d.error)}</p></div>`; return; }
+
+    if (d.stats?.per_competitor) { lastCompCounts = d.stats.per_competitor; }
+    if (d.stats?.per_group) { lastGroupCounts = d.stats.per_group; }
+    if (d.stats?.per_competitor || d.stats?.per_group) renderSidebar();
+    renderStats(d.stats);
+
+    currentPage = 1;
+    hasMore = d.has_more;
+
+    if (!d.ads || !d.ads.length) {
+      document.getElementById('content').innerHTML = '<div class="empty"><h2>No ads found</h2></div>';
+      return;
+    }
+
+    // Create grid + sentinel — reinit observer since content div is the same element
+    document.getElementById('content').innerHTML =
+      '<div class="ad-grid" id="adGrid"></div>' +
+      '<div id="sentinel" style="height:1px"></div>';
+    // Content div element is the same (innerHTML doesn't replace the container), so observer is still valid
+
+    appendCards(d.ads, true);
+    setupSentinel();
+
+    // Prefetch page 2
+    if (hasMore) prefetchPage(2);
+  } finally {
+    isLoading = false;
+  }
+}
+
+// ── Load next page (triggered by sentinel) ──
+async function loadNextPage() {
+  if (isLoading || !hasMore) return;
+  isLoading = true;
+
+  const nextPage = currentPage + 1;
+  let d;
+
+  // Use prefetched data if available
+  if (prefetchedNext && prefetchedNext.page === nextPage) {
+    d = prefetchedNext;
+    prefetchedNext = null;
+  } else {
+    try {
+      const r = await api(buildUrl(nextPage));
+      d = await r.json();
+    } catch { isLoading = false; return; }
+  }
+
+  currentPage = nextPage;
+  hasMore = d.has_more;
+
+  if (d.ads && d.ads.length > 0) {
+    appendCards(d.ads);
+  }
+
+  isLoading = false;
+
+  // Prefetch the page after this one
+  if (hasMore) prefetchPage(currentPage + 1);
+}
+
+// ── Prefetch next page JSON in background ──
+async function prefetchPage(page) {
+  try {
+    const r = await api(buildUrl(page));
+    const d = await r.json();
+    d.page = page;
+    prefetchedNext = d;
+  } catch { prefetchedNext = null; }
+}
+
+// ── Append cards to the grid and register lazy observers ──
+let _isFirstPage = true;
+
+function appendCards(ads, eager) {
+  const grid = document.getElementById('adGrid');
+  if (!grid) return;
+  _isFirstPage = !!eager;
+  const html = ads.map(ad => renderCard(ad, cardIndex++)).join('');
+  grid.insertAdjacentHTML('beforeend', html);
+  _isFirstPage = false;
+
+  // Register lazy images with observer (non-eager pages only)
+  if (!eager && imgObserver) {
+    grid.querySelectorAll('img[data-src]').forEach(img => imgObserver.observe(img));
+  }
+}
+
+// ── Render a single ad card ──
+function renderCard(ad, idx) {
+  const durClass = ad.days_running >= 30 ? 'hot' : ad.days_running >= 7 ? 'warm' : 'new';
+  const scoreClass = ad.score >= 70 ? 'hi' : ad.score >= 40 ? 'md' : 'lo';
+  const statusText = ad.is_active ? 'Active' : 'Inactive';
+  const pageName = ad.page_name || ad._competitor || 'Unknown';
+  const body = ad.body || '';
+  const title = ad.title || '';
+  const caption = ad.caption || '';
+  const adLibUrl = `https://www.facebook.com/ads/library/?id=${ad.id}`;
+  const initial = (pageName[0] || '?').toUpperCase();
+  const isVideoFormat = ad.ad_format === 'video';
+  const canPlayInline = !!ad.has_video;
+
+  return `<div class="ad-card">
+    <div class="fb-top">
+      <div class="fb-header">
+        <div class="fb-avatar" style="background:#6366f1;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px">${initial}</div>
+        <div class="fb-page-info">
+          <div class="fb-page-name">${h(pageName)}</div>
+          <div class="fb-sponsored">Sponsored</div>
+        </div>
+      </div>
+      ${body ? (body.length > 200
+        ? `<div class="fb-body clamped" onclick="this.classList.toggle('clamped')">${h(body)}</div>`
+        : `<div class="fb-body">${h(body)}</div>`) : ''}
+    </div>
+    <div class="fb-img" id="media-${idx}">
+      <img ${_isFirstPage ? 'src' : 'data-src'}="/api/preview/${ad.id}/creative" alt=""
+        onerror="this.outerHTML='<a href=\\'${adLibUrl}\\' target=\\'_blank\\' class=\\'no-img\\'>View on Facebook &#8599;</a>'">
+      ${isVideoFormat ? `<div class="play-btn" onclick="${canPlayInline ? `playVideo(${idx},'${ad.id}')` : `window.open('${adLibUrl}','_blank')`}" title="${canPlayInline ? 'Play video' : 'Open on Facebook (video source not cached yet)'}"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>` : ''}
+    </div>
+    ${title || caption ? `<div class="fb-cta">
+      <div style="min-width:0;flex:1">
+        ${caption ? `<div class="fb-cta-domain">${h(caption)}</div>` : ''}
+        ${title ? `<div class="fb-cta-title">${h(title)}</div>` : ''}
+      </div>
+    </div>` : ''}
+    ${ad.angle ? `<div class="angle-zone">
+      <div class="angle-row">
+        <div class="angle-left">
+          <span class="angle-name">${h(ad.angle)}</span>
+          <span class="angle-status ${ad.angle_status || 'generic'}">${ad.angle_status || 'unknown'}</span>
+        </div>
+        ${ad.angle_velocity ? `<span class="angle-velocity">${ad.angle_velocity}/wk</span>` : ''}
+      </div>
+    </div>` : ''}
+    <div class="card-foot">
+      <div class="card-foot-top">
+        <span class="card-comp">${h(ad._competitor || '')}</span>
+        <span class="dur ${durClass}">${ad.days_running}d &middot; ${statusText}</span>
+      </div>
+      <div class="tags">
+        ${(ad.platforms||[]).map(p => `<span class="tag pl">${h(p)}</span>`).join('')}
+        ${ad.eu_total_reach ? `<span class="tag" style="color:var(--green);border-color:rgba(52,211,153,0.15)">${ad.eu_total_reach.toLocaleString()} EU reach</span>` : ''}
+        ${ad.target_gender && ad.target_gender !== 'All' ? `<span class="tag">${h(ad.target_gender)}</span>` : ''}
+        ${ad.target_ages ? `<span class="tag">${ad.target_ages[0]}-${ad.target_ages[1]}</span>` : ''}
+      </div>
+      <div class="card-actions">
+        <span class="spacer"></span>
+        <a href="${adLibUrl}" target="_blank" class="lib-link">Ad Library &#8599;</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+function playVideo(idx, adId) {
+  const media = document.getElementById('media-' + idx);
+  if (!media) return;
+  media.innerHTML = `<video controls autoplay playsinline style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;background:#000">
+    <source src="/api/video-proxy/${adId}" type="video/mp4">
+  </video>`;
+  const vid = media.querySelector('video');
+  vid.onerror = () => {
+    media.innerHTML = '<div class="placeholder" style="color:var(--dim)">Video unavailable</div>';
+  };
+}
+
+// ── Discover tab ──
+const SUGGEST_KEYWORDS = ['online privacy', 'VPN protection', 'identity theft', 'scam protection', 'password manager', 'antivirus', 'cybersecurity', 'data breach', 'ad blocker', 'parental control', 'dark web scan', 'credit monitoring', 'fraud alert', 'secure browsing', 'tracker blocker'];
+
+function renderDiscover() {
+  document.getElementById('statsBar').innerHTML = '';
+  document.getElementById('content').innerHTML = `<div class="discover-wrap">
+    <div class="search-bar">
+      <input type="text" id="discoverInput" placeholder="Search by keyword or competitor name..." onkeydown="if(event.key==='Enter')runDiscover()">
+      <button onclick="runDiscover()" id="discoverBtn">Search</button>
+    </div>
+    <div class="suggest-chips">${SUGGEST_KEYWORDS.map(k => `<span class="chip" onclick="document.getElementById('discoverInput').value='${k}';runDiscover()">${k}</span>`).join('')}</div>
+    <div id="discoverResults"><div class="loading">Scanning your competitors' keywords...</div></div>
+  </div>`;
+  // Auto-run discovery using keywords from tracked competitors' ads
+  autoDiscover();
+}
+
+async function autoDiscover() {
+  const results = document.getElementById('discoverResults');
+  results.innerHTML = '<div class="loading">Loading competitor scan...</div>';
+
+  try {
+    const r = await api('/api/discover/auto');
+    const d = await r.json();
+    if (d.error) { results.innerHTML = `<div class="empty"><p>${h(d.error)}</p></div>`; return; }
+
+    if (d.results.length === 0) {
+      results.innerHTML = `<div class="search-meta">Scanned ${d.total_ads_scanned} ads across ${d.queries_run} keywords. No competitors found above threshold.</div>`;
+      return;
+    }
+
+    const age = d.cached_at ? ' &middot; Last scan: ' + new Date(d.cached_at).toLocaleString() : '';
+    results.innerHTML = `<div class="search-meta">${d.total_ads_scanned} ads scanned across ${d.queries_run} keywords &middot; ${d.results_above_min} competitors found${age}</div>` + renderDiscoverTable(d.results);
+  } catch(e) {
+    results.innerHTML = `<div class="empty"><p>Error: ${h(e.message)}</p></div>`;
+  }
+}
+
+async function runDiscover() {
+  const q = document.getElementById('discoverInput').value.trim();
+  if (!q) return;
+  const btn = document.getElementById('discoverBtn');
+  const results = document.getElementById('discoverResults');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  results.innerHTML = '<div class="loading">Scanning Facebook Ad Library...</div>';
+
+  try {
+    const r = await api(`/api/discover?q=${encodeURIComponent(q)}&min_active=10`);
+    const d = await r.json();
+    if (d.error) { results.innerHTML = `<div class="empty"><p>${h(d.error)}</p></div>`; return; }
+
+    results.innerHTML = '';
+    if (d.results.length === 0) {
+      results.innerHTML = `<div class="search-meta">Scanned ${d.total_ads_scanned} ads across ${d.pages_found} pages. No pages with 10+ active ads found.</div>`;
+      return;
+    }
+
+    results.innerHTML = `<div class="search-meta">Scanned ${d.total_ads_scanned} ads &middot; ${d.pages_found} pages found &middot; ${d.results.length} above threshold</div>` + renderDiscoverTable(d.results);
+  } catch(e) {
+    results.innerHTML = `<div class="empty"><p>Error: ${h(e.message)}</p></div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search';
+  }
+}
+
+function renderDiscoverTable(pages) {
+  return `<table class="disc-table">
+    <tr><th>Page</th><th>Active Ads</th><th>Platforms</th><th>Angles</th><th>New / 30d</th><th></th></tr>
+    ${pages.map(p => `
+      <tr class="disc-row" onclick="this.classList.toggle('open')">
+        <td>
+          <div class="disc-name">${h(p.page_name)} <a href="https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=US&view_all_page_id=${p.page_id}&search_type=page&media_type=all" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:400" onclick="event.stopPropagation()">Ad Library &#8599;</a></div>
+          <div class="disc-stats">ID: ${p.page_id}${p.oldest_ad ? ' &middot; Since ' + p.oldest_ad : ''}${p.matched_queries ? ' &middot; Matched: ' + p.matched_queries.join(', ') : ''}</div>
+          <div class="disc-sample">${(p.sample_texts||[]).map(t => `<div style="margin:3px 0;padding:4px 8px;background:var(--surface);border-radius:4px">${h(t)}...</div>`).join('')}</div>
+        </td>
+        <td><span class="disc-count">${p.active_ads}</span></td>
+        <td><div class="disc-platforms">${(p.platforms||[]).map(pl => `<span class="tag pl">${pl}</span>`).join('')}</div></td>
+        <td>${p.unique_angles || '-'}</td>
+        <td>${p.new_last_30d || '-'}</td>
+        <td>
+          ${p.is_tracked
+            ? `<button class="track-btn remove" onclick="event.stopPropagation();removeFromWatchlist('${p.page_id}',this)">Remove</button>`
+            : `<div style="display:flex;gap:4px;align-items:center">
+                <select class="group-select" onclick="event.stopPropagation()" style="background:var(--raised);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 6px;font-size:11px;font-family:var(--font)">
+                  ${groups.map(g => `<option value="${h(g)}">${h(g)}</option>`).join('')}
+                </select>
+                <button class="track-btn add" onclick="event.stopPropagation();addToWatchlist('${p.page_id}','${h(p.page_name).replace(/'/g,"\\'")}',this)">Track</button>
+              </div>`
+          }
+        </td>
+      </tr>`).join('')}
+  </table>`;
+}
+
+async function addToWatchlist(pageId, pageName, btn) {
+  // Find the group selector next to this button
+  const container = btn.parentElement;
+  const select = container?.querySelector('select.group-select');
+  const group = select?.value || groups[0];
+  btn.disabled = true; btn.textContent = 'Adding...';
+  try {
+    const r = await api('/api/watchlist/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_id: pageId, page_name: pageName, group })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      btn.className = 'track-btn remove';
+      btn.textContent = 'Remove';
+      btn.disabled = false;
+      btn.onclick = function(e) { e.stopPropagation(); removeFromWatchlist(pageId, btn); };
+      loadCompetitors();
+    }
+  } catch { btn.disabled = false; btn.textContent = 'Track'; }
+}
+
+async function removeFromWatchlist(pageId, btn) {
+  btn.disabled = true; btn.textContent = 'Removing...';
+  try {
+    const r = await api('/api/watchlist/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_id: pageId })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      btn.className = 'track-btn add';
+      btn.textContent = 'Track';
+      btn.disabled = false;
+      btn.onclick = function(e) { e.stopPropagation(); addToWatchlist(pageId, btn.closest('tr').querySelector('.disc-name').textContent, btn); };
+      loadCompetitors();
+    }
+  } catch { btn.disabled = false; btn.textContent = 'Remove'; }
+}
+
+async function refreshData() {
+  document.getElementById('content').innerHTML = '<div class="loading">Refreshing data from Facebook...</div>';
+  await api('/api/refresh', { method: 'POST' });
+  loadAds();
+}
+
+init();
+</script>
+</body>
+</html>
