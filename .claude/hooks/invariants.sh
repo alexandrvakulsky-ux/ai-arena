@@ -79,6 +79,16 @@ check "adspy:idle-mode-startup" \
   "Idle mode|isActivelyUsed|markUserActivity" \
   "Server must not auto-run Puppeteer / SC refresh on startup when cache exists. Wait for first user activity (token-burn fix 2026-04-17)"
 
+check "adspy:fetchAdsForPage-has-hard-timeout" \
+  "/srv/ad-spy/server.js" \
+  "FETCH_PAGE_BUDGET_MS|deadline = Date\.now\(\)" \
+  "fetchAdsForPage must have a hard total-time budget. Without it, slow Meta API could hang a single page_id for 25*30s=12 min, stalling background refresh (hang fixed 2026-04-22)"
+
+check "adspy:preserve-prev-cache-on-refresh" \
+  "/srv/ad-spy/server.js" \
+  "preserved.*ads from previous cache|cache-merge" \
+  "_fetchAllAdsFresh must merge prev cache entries not re-fetched this cycle. Without this, capped pagination or partial failures drop historical ads (data-preservation fix 2026-04-22)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
