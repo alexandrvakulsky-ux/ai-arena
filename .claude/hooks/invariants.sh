@@ -109,6 +109,16 @@ check "adspy:disk-only-sidebar-counts" \
   "loadAllCompCachesFromDisk" \
   "Sidebar per-competitor/per-group counts must be computed from disk-only reads, never triggering SC fetches. Otherwise viewing sidebar counts would fetch every competitor, defeating the lazy-fetch purpose (perf rule 2026-04-22)"
 
+check "adspy:per-page-id-merge" \
+  "/srv/ad-spy/server.js" \
+  "mergeFreshWithPrev" \
+  "When a competitor's fresh fetch is missing any page_id (SC returned empty), merge in prev cache entries for that page_id. Without this, Nebula loses 3/5 page_ids silently each refresh (coverage fix 2026-04-22)"
+
+check "adspy:delay-between-page-ids" \
+  "/srv/ad-spy/server.js" \
+  "back-to-back requests|between page_ids" \
+  "Must have a delay between SC calls for different page_ids within one competitor. Back-to-back requests return empty. Verified Nebula goes 3/5 -> 5/5 with 1.5s delay (2026-04-22)"
+
 check "adspy:applyLatestMeta-defined" \
   "/srv/ad-spy/server.js" \
   "function applyLatestMeta" \
