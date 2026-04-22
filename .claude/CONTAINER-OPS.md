@@ -46,6 +46,13 @@ docker exec ad-spy node /workspace/scripts/verify-video-detection.js 30 --active
 ```
 Runs automatically once per day on first user activity. Mismatches logged to `/workspace/.cache/video-audit-{ts}.json`. See `grep \[audit\] /workspace/server.log`.
 
+**Competitor coverage audit** (verifies every page_id returns SC data — catches silent dropouts like the Nebula bug):
+```
+docker exec ad-spy node /workspace/scripts/verify-competitor-coverage.js          # all
+docker exec ad-spy node /workspace/scripts/verify-competitor-coverage.js Nebula   # one
+```
+Pinpoints "competitor X has too few ads" into "page_id Y is missing from cache, here's the curl to fix it". Use this before chasing data-feel-low complaints.
+
 **Force cache refresh:**
 ```
 docker exec ad-spy sh -c "rm -f /workspace/.cache/_ads_cache.json /workspace/.cache/_sc_fetch_log.json" && docker restart ad-spy
@@ -53,10 +60,13 @@ docker exec ad-spy sh -c "rm -f /workspace/.cache/_ads_cache.json /workspace/.ca
 ```
 
 **Cost control knobs** (all in `server.js`):
-- `SC_REFETCH_INTERVAL` — 4h throttle on ScrapeCreators per-page fetches
-- `IDLE_THRESHOLD_MS` — 2h; no background refresh if user idle longer
-- `FETCH_PAGE_BUDGET_MS` — 90s hard budget on Meta API pagination per page_id
-- `EU_TOTAL_BUDGET_MS` — 120s hard budget on EU enrichment phase
+- `COMP_TTL_MS` — 4h per-competitor cache TTL
+- `COMP_MAX_CONCURRENT_FETCH` — 2 parallel SC requests cap (higher → SC starts returning empties)
+- `MAX_FIRST_CALL_RETRIES` — 6 retries for SC empty-response flakiness
+- 1.5s mandatory delay between page_ids within one competitor's fetch
+- `IDLE_THRESHOLD_MS` — 2h; idle threshold (legacy, used by the old bulk-refresh path which is dead code)
+
+**Architecture**: per-competitor lazy-fetch. Each competitor has its own `.cache/comp/{slug}.json` file with independent 4h TTL. Sidebar counts read these files directly without triggering fetches. Endpoint requests only fetch the competitors their filter actually needs. No more global cache wipe = no more cascading data loss.
 
 **When UX feels broken (images missing, videos no play button):**
 1. Check if Puppeteer is running: `docker exec ad-spy tail -20 /workspace/server.log | grep -i previews`
