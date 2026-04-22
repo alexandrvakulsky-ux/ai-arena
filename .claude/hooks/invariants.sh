@@ -94,6 +94,11 @@ check "adspy:preserve-prev-cache-on-refresh" \
   "preserved.*ads from previous cache|cache-merge" \
   "_fetchAllAdsFresh must merge prev cache entries not re-fetched this cycle. Without this, capped pagination or partial failures drop historical ads (data-preservation fix 2026-04-22)"
 
+check "adspy:rollback-bad-refreshes-per-competitor" \
+  "/srv/ad-spy/server.js" \
+  "REFRESH_DROP_THRESHOLD|cache-protect" \
+  "When a refresh returns <20% of prev cache count for a competitor (Meta API rate-limited + SC flaky + Puppeteer only gets 30), system must roll back to prev data for that competitor. Without this, a bad refresh silently destroys 2500-ad historical data (rate-limit resilience fix 2026-04-22)"
+
 check "adspy:applyLatestMeta-defined" \
   "/srv/ad-spy/server.js" \
   "function applyLatestMeta" \
