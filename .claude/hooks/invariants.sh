@@ -81,8 +81,18 @@ check_not "adspy:no-eager-image-loading" \
 
 check "adspy:idle-mode-startup" \
   "/srv/ad-spy/server.js" \
-  "Idle mode|isActivelyUsed|markUserActivity" \
+  "Idle mode|isActivelyUsed|markUserActivity|idle = \\\$0" \
   "Server must not auto-run Puppeteer / SC refresh on startup when cache exists. Wait for first user activity (token-burn fix 2026-04-17)"
+
+check_not "adspy:no-setInterval-money-burner" \
+  "/srv/ad-spy/server.js" \
+  "setInterval\(" \
+  "setInterval is forbidden in server.js — it would call paid APIs (SC, Claude) on a timer regardless of user activity, breaking the 'idle = \$0' rule. Use user-triggered logic instead (cost rule 2026-04-22)"
+
+check "adspy:paid-audit-killswitch" \
+  "/srv/ad-spy/server.js" \
+  "AD_SPY_DISABLE_PAID_AUDITS" \
+  "Daily audits ($~1/day) must have a kill-switch env var. Set AD_SPY_DISABLE_PAID_AUDITS=1 to disable when running cheap (cost rule 2026-04-22)"
 
 check "adspy:fetchAdsForPage-has-hard-timeout" \
   "/srv/ad-spy/server.js" \
