@@ -94,10 +94,24 @@ check "adspy:preserve-prev-cache-on-refresh" \
   "preserved.*ads from previous cache|cache-merge" \
   "_fetchAllAdsFresh must merge prev cache entries not re-fetched this cycle. Without this, capped pagination or partial failures drop historical ads (data-preservation fix 2026-04-22)"
 
-check "adspy:ad-format-from-meta-at-response-time" \
+check "adspy:applyLatestMeta-defined" \
   "/srv/ad-spy/server.js" \
-  "if \(meta\.ad_format\) ad\.ad_format" \
-  "Response-time re-read of meta.json is required. normalizeAd caches ad_format='image' at ad-creation time; Puppeteer writes meta.json later with correct format. Without response-time re-read, video ads stay marked 'image' forever until full cache rebuild (fix 2026-04-22)"
+  "function applyLatestMeta" \
+  "Response-time enrichment helper must exist. Refreshes ad.has_video + ad.ad_format from their sources of truth (_video_urls.json, meta.json) because cache entries are created before Puppeteer post-processing. Single helper enforces the same update logic across all endpoints (universal fix 2026-04-22)"
+
+# Check: every adForList caller must be preceded by applyLatestMeta.
+# Implementation: count adForList call sites vs applyLatestMeta call sites in
+# the same file. Must be >=1 applyLatestMeta for each unique call-site region.
+# Simpler: require at least 2 applyLatestMeta calls (one per endpoint). New
+# endpoints adding adForList must also add applyLatestMeta or this fails.
+_adforlist_calls=$(grep -c "\.map(adForList)" /srv/ad-spy/server.js 2>/dev/null || echo 0)
+# Count call sites only, not the function definition
+_applymeta_calls=$(grep -c "^\s*applyLatestMeta(" /srv/ad-spy/server.js 2>/dev/null || echo 0)
+if [ "$_adforlist_calls" -gt 0 ] && [ "$_applymeta_calls" -lt "$_adforlist_calls" ]; then
+  FAILURES+=("❌ adspy:applyLatestMeta-called-for-every-adForList
+   File: /srv/ad-spy/server.js
+   Reason: found $_adforlist_calls adForList() calls but only $_applymeta_calls applyLatestMeta() calls. Every endpoint that serializes ads via adForList must first call applyLatestMeta(ads) to refresh post-cache fields. Otherwise ad_format/has_video go stale forever (universal response-time enrichment rule 2026-04-22)")
+fi
 
 check "adspy:daily-audit-runs-on-activity" \
   "/srv/ad-spy/server.js" \
