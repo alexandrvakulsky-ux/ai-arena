@@ -39,10 +39,15 @@ check_not() {
 
 # ── Ad Spy invariants (deployed at /srv/ad-spy) ─────────────────────────────
 
-check "adspy:video-play-btn-all-video-format" \
+check "adspy:every-ad-card-clickable-to-fb" \
   "/srv/ad-spy/public/index.html" \
-  "isVideoFormat.*play-btn" \
-  "Play button must render for every ad with ad_format==='video' (bug fixed 2026-04-17)"
+  "onclick=.*window\.open.*adLibUrl" \
+  "Every ad card image area must be clickable -> opens FB Ad Library. Guarantees users can always view the original ad even if Puppeteer hasn't detected format yet. Structural fix for recurring 'no play button' bug (2026-04-22)."
+
+check "adspy:video-play-btn-when-playable" \
+  "/srv/ad-spy/public/index.html" \
+  "isVideoFormat && canPlayInline" \
+  "Inline play button must render when ad is video-format AND has cached video URL. If just video-format but no URL, click-through to FB (which handles the playback) takes over instead of showing a broken button."
 
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
