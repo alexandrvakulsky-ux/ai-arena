@@ -38,6 +38,32 @@ Ad Spy workspace bind mount: `/srv/ad-spy` → `/workspace`
 Puppeteer cache volume: `ad-spy-puppeteer-cache`
 **Repo:** `git@github.com:alexandrvakulsky-ux/ad-spy.git` — the ad-spy container has its own git clone at `/workspace` with SSH deploy key at `~/.ssh/github-deploy-key`. To commit changes: `docker exec ad-spy sh -c "cd /workspace && git add <files> && git commit -m '...' && git push"`. Source files to deploy live on host at `/srv/ad-spy/` (bind-mounted) — after editing on host, copy into container with `docker cp` and then commit from inside.
 
+### Ad Spy operations runbook
+
+**Video-detection audit** (checks classification accuracy via ScrapeCreators ground truth):
+```
+docker exec ad-spy node /workspace/scripts/verify-video-detection.js 30 --active
+```
+Runs automatically once per day on first user activity. Mismatches logged to `/workspace/.cache/video-audit-{ts}.json`. See `grep \[audit\] /workspace/server.log`.
+
+**Force cache refresh:**
+```
+docker exec ad-spy sh -c "rm -f /workspace/.cache/_ads_cache.json /workspace/.cache/_sc_fetch_log.json" && docker restart ad-spy
+# Then make any /api/ads/new request to trigger the fetch.
+```
+
+**Cost control knobs** (all in `server.js`):
+- `SC_REFETCH_INTERVAL` — 4h throttle on ScrapeCreators per-page fetches
+- `IDLE_THRESHOLD_MS` — 2h; no background refresh if user idle longer
+- `FETCH_PAGE_BUDGET_MS` — 90s hard budget on Meta API pagination per page_id
+- `EU_TOTAL_BUDGET_MS` — 120s hard budget on EU enrichment phase
+
+**When UX feels broken (images missing, videos no play button):**
+1. Check if Puppeteer is running: `docker exec ad-spy tail -20 /workspace/server.log | grep -i previews`
+2. Count cached images: `docker exec ad-spy sh -c 'ls /workspace/.cache/*.jpg | wc -l'`
+3. Run audit: command above
+4. If audit shows >20% mismatch, a refresh is needed. Force-refresh via commands above.
+
 ## Container Rebuild
 
 ### When to rebuild

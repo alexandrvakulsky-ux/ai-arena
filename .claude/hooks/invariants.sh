@@ -94,6 +94,16 @@ check "adspy:preserve-prev-cache-on-refresh" \
   "preserved.*ads from previous cache|cache-merge" \
   "_fetchAllAdsFresh must merge prev cache entries not re-fetched this cycle. Without this, capped pagination or partial failures drop historical ads (data-preservation fix 2026-04-22)"
 
+check "adspy:ad-format-from-meta-at-response-time" \
+  "/srv/ad-spy/server.js" \
+  "if \(meta\.ad_format\) ad\.ad_format" \
+  "Response-time re-read of meta.json is required. normalizeAd caches ad_format='image' at ad-creation time; Puppeteer writes meta.json later with correct format. Without response-time re-read, video ads stay marked 'image' forever until full cache rebuild (fix 2026-04-22)"
+
+check "adspy:daily-audit-runs-on-activity" \
+  "/srv/ad-spy/server.js" \
+  "maybeRunDailyAudit|verify-video-detection\.js" \
+  "Daily video-detection audit must run on first user activity each day. Without it, detection drift goes unnoticed (audit infrastructure 2026-04-22)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
