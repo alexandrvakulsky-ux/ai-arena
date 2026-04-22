@@ -40,18 +40,16 @@ Puppeteer cache volume: `ad-spy-puppeteer-cache`
 
 ### Ad Spy operations runbook
 
-**Video-detection audit** (checks classification accuracy via ScrapeCreators ground truth):
-```
-docker exec ad-spy node /workspace/scripts/verify-video-detection.js 30 --active
-```
-Runs automatically once per day on first user activity. Mismatches logged to `/workspace/.cache/video-audit-{ts}.json`. See `grep \[audit\] /workspace/server.log`.
+**Daily self-healing audits** (fully automated — fire on first user activity each day):
+- **Video-detection audit** — random-sample check that `ad_format`/`has_video` match ScrapeCreators ground truth.
+- **Competitor coverage audit** — verifies every page_id returns data; **auto-force-refreshes** competitors with recoverable gaps (where SC has data but our cache is missing it).
 
-**Competitor coverage audit** (verifies every page_id returns SC data — catches silent dropouts like the Nebula bug):
+Both report in `/workspace/server.log` under `[video-audit]`, `[coverage-audit]`, `[coverage]`, and `[audit]` tags. No human action required — if a competitor goes silently empty, the next user visit triggers the audit which triggers the recovery.
+
+To inspect or run on demand (rarely needed):
 ```
-docker exec ad-spy node /workspace/scripts/verify-competitor-coverage.js          # all
-docker exec ad-spy node /workspace/scripts/verify-competitor-coverage.js Nebula   # one
+docker exec ad-spy grep "\[coverage\]\|\[audit\]" /workspace/server.log | tail -20
 ```
-Pinpoints "competitor X has too few ads" into "page_id Y is missing from cache, here's the curl to fix it". Use this before chasing data-feel-low complaints.
 
 **Force cache refresh:**
 ```

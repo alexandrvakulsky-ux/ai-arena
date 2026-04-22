@@ -143,6 +143,11 @@ check "adspy:daily-audit-runs-on-activity" \
   "maybeRunDailyAudit|verify-video-detection\.js" \
   "Daily video-detection audit must run on first user activity each day. Without it, detection drift goes unnoticed (audit infrastructure 2026-04-22)"
 
+check "adspy:coverage-audit-self-heals" \
+  "/srv/ad-spy/server.js" \
+  "verify-competitor-coverage\.js|auto-recovered" \
+  "Coverage audit must run automatically AND auto-recover any recoverable gaps (force-refresh competitors with empty page_ids). Manual scripts are not enough — user shouldn't have to run anything (automation rule 2026-04-22)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
