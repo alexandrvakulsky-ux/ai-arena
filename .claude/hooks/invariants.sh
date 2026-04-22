@@ -96,8 +96,18 @@ check "adspy:preserve-prev-cache-on-refresh" \
 
 check "adspy:rollback-bad-refreshes-per-competitor" \
   "/srv/ad-spy/server.js" \
-  "REFRESH_DROP_THRESHOLD|cache-protect" \
-  "When a refresh returns <20% of prev cache count for a competitor (Meta API rate-limited + SC flaky + Puppeteer only gets 30), system must roll back to prev data for that competitor. Without this, a bad refresh silently destroys 2500-ad historical data (rate-limit resilience fix 2026-04-22)"
+  "comp-protect|cache-protect" \
+  "When a refresh returns <20% of prev cache count for a competitor, system must roll back to prev data for that competitor. Without this, a bad refresh silently destroys historical data (rate-limit resilience fix 2026-04-22)"
+
+check "adspy:per-competitor-cache-architecture" \
+  "/srv/ad-spy/server.js" \
+  "COMP_CACHE_DIR|getCompetitorAds|loadCompCache" \
+  "Per-competitor cache architecture must be in place. Each competitor has its own .cache/comp/{slug}.json file with independent 4h TTL. Replaces the mega-refresh that hung on Meta API rate limits and corrupted the whole dataset when any one competitor failed (architecture rewrite 2026-04-22)"
+
+check "adspy:disk-only-sidebar-counts" \
+  "/srv/ad-spy/server.js" \
+  "loadAllCompCachesFromDisk" \
+  "Sidebar per-competitor/per-group counts must be computed from disk-only reads, never triggering SC fetches. Otherwise viewing sidebar counts would fetch every competitor, defeating the lazy-fetch purpose (perf rule 2026-04-22)"
 
 check "adspy:applyLatestMeta-defined" \
   "/srv/ad-spy/server.js" \
