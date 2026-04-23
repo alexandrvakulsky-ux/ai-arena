@@ -89,6 +89,11 @@ check_not "adspy:no-setInterval-money-burner" \
   "setInterval\(" \
   "setInterval is forbidden in server.js — it would call paid APIs (SC, Claude) on a timer regardless of user activity, breaking the 'idle = \$0' rule. Use user-triggered logic instead (cost rule 2026-04-22)"
 
+check_not "adspy:no-page-screenshot-fallback" \
+  "/srv/ad-spy/extract-previews.js" \
+  "page\.screenshot\(" \
+  "Do not save page.screenshot as creative.jpg — it captures the Facebook Ad Library UI chrome (Finland dropdown, search filters, empty content) which users see as broken previews. Leave creative.jpg missing so /api/preview returns 404 and frontend shows 'View on Facebook' fallback (UX fix 2026-04-22)"
+
 check "adspy:paid-audit-killswitch" \
   "/srv/ad-spy/server.js" \
   "AD_SPY_DISABLE_PAID_AUDITS" \
