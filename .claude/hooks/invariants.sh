@@ -46,8 +46,13 @@ check "adspy:every-ad-card-clickable-to-fb" \
 
 check "adspy:video-play-btn-when-playable" \
   "/srv/ad-spy/public/index.html" \
-  "isVideoFormat && canPlayInline" \
-  "Inline play button must render when ad is video-format AND has cached video URL. If just video-format but no URL, click-through to FB (which handles the playback) takes over instead of showing a broken button."
+  "canPlayInline \? .*play-btn|canPlayInline \? \`<button" \
+  "Inline play button must render whenever ad has a cached video URL (canPlayInline=has_video). Previously required ad_format='video' too, but Puppeteer lags in writing meta.json so 46 of 47 videos lost their button silently. has_video alone is the source of truth (2026-04-24)."
+
+check_not "adspy:play-btn-not-format-gated" \
+  "/srv/ad-spy/public/index.html" \
+  "isVideoFormat && canPlayInline \? " \
+  "Play button render MUST NOT be gated on ad_format==='video' alongside has_video. ad_format is often 'image' for fresh ads even when video URL is captured. Use canPlayInline alone. Recurring bug since 2026-04-17; this guard blocks its return (2026-04-24)."
 
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
