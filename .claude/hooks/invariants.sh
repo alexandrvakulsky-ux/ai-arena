@@ -41,8 +41,8 @@ check_not() {
 
 check "adspy:every-ad-card-clickable-to-fb" \
   "/srv/ad-spy/public/index.html" \
-  "onclick=.*window\.open.*adLibUrl" \
-  "Every ad card image area must be clickable -> opens FB Ad Library. Guarantees users can always view the original ad even if Puppeteer hasn't detected format yet. Structural fix for recurring 'no play button' bug (2026-04-22)."
+  "click-overlay\"[^>]*href=\"\\\$\\{adLibUrl\\}\"" \
+  "Every ad card image area must be clickable -> opens FB Ad Library. Now implemented as an <a class=\"click-overlay\"> anchor (P0.4 keyboard-accessible). Guarantees users can always view the original ad even if Puppeteer hasn't detected format yet. Structural fix for recurring 'no play button' bug (2026-04-22)."
 
 check "adspy:video-play-btn-when-playable" \
   "/srv/ad-spy/public/index.html" \
