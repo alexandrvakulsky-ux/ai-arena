@@ -51,18 +51,32 @@ To inspect or run on demand (rarely needed):
 docker exec ad-spy grep "\[coverage\]\|\[audit\]" /workspace/server.log | tail -20
 ```
 
-**Force cache refresh:**
+**Force cache refresh** (per-competitor now, not global):
 ```
-docker exec ad-spy sh -c "rm -f /workspace/.cache/_ads_cache.json /workspace/.cache/_sc_fetch_log.json" && docker restart ad-spy
-# Then make any /api/ads/new request to trigger the fetch.
+# One competitor:
+curl -X POST "http://localhost:3001/api/refresh?competitor=Nebula" -H "x-app-token: $TOKEN"
+# One group:
+curl -X POST "http://localhost:3001/api/refresh?group=Genesis" -H "x-app-token: $TOKEN"
+# Everything (sequential, ~5-10 min):
+curl -X POST "http://localhost:3001/api/refresh" -H "x-app-token: $TOKEN"
+# Nuclear — delete all per-comp caches + restart:
+docker exec ad-spy sh -c "rm -rf /workspace/.cache/comp/* /workspace/.cache/_sc_fetch_log.json" && docker restart ad-spy
 ```
+
+**Find missing persona pages** (competitors like BetterMe, Paw Champ, Finelo run most ads through spokesperson accounts):
+```
+docker exec ad-spy node /workspace/scripts/find-missing-personas.js
+docker exec ad-spy node /workspace/scripts/apply-persona-additions.js /workspace/.cache/persona-audit-NNN.json
+```
+Costs ~$1-2 per run. Do it when you suspect undercount for a brand.
 
 **Cost control knobs** (all in `server.js`):
 - `COMP_TTL_MS` — 4h per-competitor cache TTL
 - `COMP_MAX_CONCURRENT_FETCH` — 2 parallel SC requests cap (higher → SC starts returning empties)
 - `MAX_FIRST_CALL_RETRIES` — 6 retries for SC empty-response flakiness
 - 1.5s mandatory delay between page_ids within one competitor's fetch
-- `IDLE_THRESHOLD_MS` — 2h; idle threshold (legacy, used by the old bulk-refresh path which is dead code)
+- `IDLE_THRESHOLD_MS` — 2h; if no user activity in this window, skip background refreshes entirely
+- `AD_SPY_DISABLE_PAID_AUDITS=1` env var — disables the ~$1/day daily audits
 
 **Architecture**: per-competitor lazy-fetch. Each competitor has its own `.cache/comp/{slug}.json` file with independent 4h TTL. Sidebar counts read these files directly without triggering fetches. Endpoint requests only fetch the competitors their filter actually needs. No more global cache wipe = no more cascading data loss.
 
