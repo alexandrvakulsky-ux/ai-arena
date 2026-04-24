@@ -54,6 +54,11 @@ check_not "adspy:play-btn-not-format-gated" \
   "isVideoFormat && canPlayInline \? " \
   "Play button render MUST NOT be gated on ad_format==='video' alongside has_video. ad_format is often 'image' for fresh ads even when video URL is captured. Use canPlayInline alone. Recurring bug since 2026-04-17; this guard blocks its return (2026-04-24)."
 
+check "adspy:video-index-populated-on-sc-fetch" \
+  "/srv/ad-spy/server.js" \
+  "videoIdxDirty|backfillVideoIndex" \
+  "When SC fetch captures _video_hd_url/_video_sd_url on an ad, it MUST also write to _video_urls.json. Otherwise has_video=true in API response but /api/video-proxy returns 404 = play button shows but video doesn't play (2026-04-24 bug)."
+
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
   "SC_REFETCH_INTERVAL = [1-4] \* 60 \* 60 \* 1000" \
