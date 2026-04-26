@@ -79,6 +79,11 @@ check "adspy:adForList-uses-contract" \
   "toRenderAd|require\\('./lib/ad-contract'\\)" \
   "adForList serializer must delegate to lib/ad-contract.toRenderAd. Without this, fetch internals leak into API responses and frontend (re-couples render to fetch internals)."
 
+check "adspy:sc-deep-pagination-cap" \
+  "/srv/ad-spy/server.js" \
+  "MAX_SC_PAGES_PER_PAGEID = ([0-9]{2,})" \
+  "SC pagination cap MUST be ≥50 (we use 100). Old 25-page cap missed 1100+ ads on Cloaked, 500+ on Guardio because high-volume competitors paginate way past 25 pages on SC. Cost guard is in the constant comment header (2026-04-26)."
+
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
   "SC_REFETCH_INTERVAL = [1-4] \* 60 \* 60 \* 1000" \
