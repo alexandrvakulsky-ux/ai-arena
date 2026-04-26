@@ -79,6 +79,16 @@ check "adspy:adForList-uses-contract" \
   "toRenderAd|require\\('./lib/ad-contract'\\)" \
   "adForList serializer must delegate to lib/ad-contract.toRenderAd. Without this, fetch internals leak into API responses and frontend (re-couples render to fetch internals)."
 
+check "adspy:cache-write-enforces-min-fields" \
+  "/srv/ad-spy/server.js" \
+  "CACHE_MIN_FIELDS|cache-enforce" \
+  "saveCompCache must validate ads against CACHE_MIN_FIELDS (id, page_id, _competitor) at write time. Without write-time enforcement, a buggy fetch source poisons the cache silently and only surfaces at render — opposite of the contract's intent (2026-04-26)."
+
+check "adspy:frontend-uses-contract-urls" \
+  "/srv/ad-spy/public/index.html" \
+  "ad\\.image_proxy_url|ad\\.video_proxy_url" \
+  "Frontend must use ad.image_proxy_url / ad.video_proxy_url from the contract, not hardcoded paths. Falls back to /api/preview/.../creative if unset, but the canonical source is the contract field. Decouples URL structure from frontend (2026-04-26)."
+
 check "adspy:sc-deep-pagination-cap" \
   "/srv/ad-spy/server.js" \
   "MAX_SC_PAGES_PER_PAGEID = ([0-9]{2,})" \
@@ -106,8 +116,8 @@ check "adspy:video-url-capture-in-puppeteer" \
 
 check "adspy:images-use-data-src-lazy" \
   "/srv/ad-spy/public/index.html" \
-  "data-src=\"/api/preview" \
-  "Card images must use data-src (not src=) so IntersectionObserver controls loading. Without this, every page open hits the server with 50 parallel image requests (bug fixed 2026-04-17)"
+  "data-src=\"\\\$\\{ad\\.image_proxy_url|data-src=\"/api/preview" \
+  "Card images must use data-src (not src=) so IntersectionObserver controls loading. URL can be ad.image_proxy_url (contract) or /api/preview/{id}/creative (fallback). Without data-src, every page open hits server with 50 parallel image requests (bug fixed 2026-04-17, contract version 2026-04-26)"
 
 check_not "adspy:no-eager-image-loading" \
   "/srv/ad-spy/public/index.html" \
