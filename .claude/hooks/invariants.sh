@@ -69,6 +69,16 @@ check "adspy:sanity-check-script" \
   "function check\\(comp\\)|deepChecks" \
   "Cache-reasonability autotest must exist. Runs on Stop hook (free, cache-only) and on demand with --deep (video-proxy verify + FB cross-check). Catches dead page_ids, stale data, broken video proxy before user notices (2026-04-25)."
 
+check "adspy:ad-contract-decouples-fetch-render" \
+  "/srv/ad-spy/lib/ad-contract.js" \
+  "RENDER_FIELDS|toRenderAd|validateBatch" \
+  "Ad contract module MUST exist. It's the single boundary between fetch and render — frontend reads only contract fields, fetch sources can change freely. Without this, every fetch refactor risks breaking renderer (recurring 'video button broke' class of bug). See lib/ad-contract.js header for the rule (2026-04-26)."
+
+check "adspy:adForList-uses-contract" \
+  "/srv/ad-spy/server.js" \
+  "toRenderAd|require\\('./lib/ad-contract'\\)" \
+  "adForList serializer must delegate to lib/ad-contract.toRenderAd. Without this, fetch internals leak into API responses and frontend (re-couples render to fetch internals)."
+
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
   "SC_REFETCH_INTERVAL = [1-4] \* 60 \* 60 \* 1000" \
