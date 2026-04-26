@@ -69,6 +69,11 @@
           },
           {
             "type": "command",
+            "command": "docker exec ad-spy node /workspace/scripts/sanity-check.js 2>&1 | grep -E '✗|⚠|Summary' || true",
+            "statusMessage": "Ad data reasonability check..."
+          },
+          {
+            "type": "command",
             "command": "node /workspace/scripts/save-session.js",
             "statusMessage": "Saving session history..."
           },

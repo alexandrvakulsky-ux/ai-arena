@@ -59,6 +59,16 @@ check "adspy:video-index-populated-on-sc-fetch" \
   "videoIdxDirty|backfillVideoIndex" \
   "When SC fetch captures _video_hd_url/_video_sd_url on an ad, it MUST also write to _video_urls.json. Otherwise has_video=true in API response but /api/video-proxy returns 404 = play button shows but video doesn't play (2026-04-24 bug)."
 
+check "adspy:video-pause-on-scroll" \
+  "/srv/ad-spy/public/index.html" \
+  "intersectionRatio < 0\\.5 && !vid\\.paused" \
+  "Inline video player must pause when scrolled out of view (>50% off-screen). Otherwise multiple background videos play simultaneously as user scrolls, wasting bandwidth + browser resources (2026-04-25)."
+
+check "adspy:sanity-check-script" \
+  "/srv/ad-spy/scripts/sanity-check.js" \
+  "function check\\(comp\\)|deepChecks" \
+  "Cache-reasonability autotest must exist. Runs on Stop hook (free, cache-only) and on demand with --deep (video-proxy verify + FB cross-check). Catches dead page_ids, stale data, broken video proxy before user notices (2026-04-25)."
+
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
   "SC_REFETCH_INTERVAL = [1-4] \* 60 \* 60 \* 1000" \
