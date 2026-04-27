@@ -84,6 +84,11 @@ check "adspy:cache-write-enforces-min-fields" \
   "CACHE_MIN_FIELDS|cache-enforce" \
   "saveCompCache must validate ads against CACHE_MIN_FIELDS (id, page_id, _competitor) at write time. Without write-time enforcement, a buggy fetch source poisons the cache silently and only surfaces at render — opposite of the contract's intent (2026-04-26)."
 
+check "adspy:adIndex-stays-in-sync" \
+  "/srv/ad-spy/server.js" \
+  "rebuildAdIndex\\(\\)" \
+  "rebuildAggregateCache must call rebuildAdIndex so /api/preview can find newly-fetched ads' _images URLs. Without this, the by-id lookup goes stale and on-demand CDN fetch returns 404 even though CDN URL is valid (stuck-spinner bug 2026-04-26)."
+
 check "adspy:frontend-uses-contract-urls" \
   "/srv/ad-spy/public/index.html" \
   "ad\\.image_proxy_url|ad\\.video_proxy_url" \
