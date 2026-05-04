@@ -213,6 +213,20 @@ check "adspy:coverage-audit-self-heals" \
   "verify-competitor-coverage\.js|auto-recovered" \
   "Coverage audit must run automatically AND auto-recover any recoverable gaps (force-refresh competitors with empty page_ids). Manual scripts are not enough — user shouldn't have to run anything (automation rule 2026-04-22)"
 
+# 2026-05-04 — verify-video-detection.js silently failed for ~2 weeks because
+# it was reading the legacy _ads_cache.json that migrateLegacyCache deletes.
+# Daily video-drift audit produced nothing. Locking in the per-comp loader so
+# this doesn't recur after any future refactor.
+check_not "adspy:video-audit-uses-legacy-cache" \
+  "/srv/ad-spy/scripts/verify-video-detection.js" \
+  "_ads_cache\.json" \
+  "verify-video-detection.js must NOT reference _ads_cache.json — that file is deleted by migrateLegacyCache. Read per-competitor caches via _watchlist.json + comp/{slug}.json instead (matches verify-competitor-coverage.js)"
+
+check "adspy:video-audit-uses-per-comp-caches" \
+  "/srv/ad-spy/scripts/verify-video-detection.js" \
+  "WATCHLIST_FILE|COMP_CACHE_DIR" \
+  "verify-video-detection.js must load ads by walking per-competitor caches (the post-2026-04-22 architecture). Otherwise the daily video-drift audit silently no-ops and detection bugs go unnoticed for weeks (P1 fix 2026-05-04)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
