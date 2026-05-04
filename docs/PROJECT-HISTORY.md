@@ -1,7 +1,7 @@
 # AI Arena — Project History & Engineering Log
 
 > How this project was built, the hardest problems we solved, and lessons learned.
-> Covers the first ~2 weeks of development (late March – early April 2026).
+> Covers late March 2026 (project start) through early May 2026 (Ad Spy production + multi-container topology).
 
 ---
 
@@ -68,6 +68,77 @@ A multi-model AI comparison app. You ask a question, three models answer in para
 **Day 14: Next Project Research**
 - Researched Facebook Ad Library API, competitor landscape (AdSpy, BigSpy, Minea, etc.)
 - Compiled findings into research brief for ad intelligence tool
+
+### Week 3 — Ad Spy goes from idea to production
+
+**Day 15-16 (2026-04-08 → 09): Ad Spy v2 — Lazy loading + Discover tab**
+- Built second iteration on top of Meta Ad Library API. Hit suppression issues (Meta hides cybersecurity-niche advertisers from API responses for some page_ids).
+- Added ScrapeCreators (SC) as primary data source — paid (~$0.003/call) but reliable.
+- Smart fallback algorithm to detect Meta API suppression, trigger ScrapeCreators / Puppeteer.
+- New tabs: Discover (keyword search + auto-scan), Watchlist (add/remove tracked competitors).
+- Image pipeline: on-demand CDN fetch + disk cache, no upfront prefetch.
+
+**Day 18-19 (2026-04-17): Ad Spy v3 — Groups + inline videos**
+- Sidebar grouping: Digital Security (10 competitors) + Genesis (14 competitors).
+- Inline video playback (`<video>` tag with custom proxy endpoint, Range request support).
+- ~2,000 ads tracked, 24 competitors.
+- "View on Facebook" fallback when preview can't be extracted.
+
+**Day 22-23 (2026-04-22): Per-competitor architecture rewrite**
+- The mega-refresh model was fundamentally broken: one transaction iterated all 24 competitors, hung on Meta rate limits, wiped the global cache when ANY competitor failed.
+- Replaced with **per-competitor lazy fetch**:
+  - `.cache/comp/{slug}.json` — one cache file per competitor, independent 4h TTL.
+  - Stale-while-revalidate semantics; missing cache blocks on fetch.
+  - **Rollback protection**: refresh returning <20% of previous count reverts to previous data.
+  - **Per-page-id merge**: multi-page competitors (Nebula 5 page_ids, BetterMe 12) merge previous data for any page returning empty — no silent dropouts.
+  - **Idle = $0 rule**: no `setInterval`, no startup auto-fetch. All paid calls downstream of user activity.
+- Cascade of bugs found and fixed in order:
+  1. Meta API rate-limit (error 613) silently wipes data → SC retry on empty + per-competitor rollback.
+  2. SC flakiness (0/29/0 pattern on consecutive calls) → 6-retry with exponential backoff.
+  3. Back-to-back SC requests return empty (Nebula bug) → 1.5s mandatory delay between page_ids.
+  4. Empty-but-cached treated as missing → `hasData` check changed to `hasCacheEntry` (timestamp > 0).
+  5. `ad_format` defaults to 'image' for fresh ads → `applyLatestMeta(ads)` re-reads meta.json + video_urls.json at response time.
+  6. Recurring "video button" complaints → made whole image area clickable to FB Ad Library, regardless of detected format. Detection accuracy stops mattering for the click affordance.
+
+**Day 24 (2026-04-24): Architecture polish + MISTAKES.md**
+- Documented the 8-class mistake taxonomy in `/srv/ad-spy/MISTAKES.md` (now `/tmp/ad-spy/MISTAKES.md` after the multi-container split).
+- Each entry has the bug → root cause → fix → invariant pattern. Stop-hook invariants enforce the taxonomy.
+
+**Day 26 (2026-04-26): ad-contract decoupling + DS undercount**
+- The "fetch broke the video button" pattern recurred. Real fix: **decouple fetch from render**.
+  - `lib/ad-contract.js` — single fetch→render transformer (`toRenderAd(rawAd)`), `RENDER_FIELDS` defines what frontend can read.
+  - Three layers of enforcement: write-time (`saveCompCache CACHE_MIN_FIELDS`), read-time (`toRenderAd + validate`), Stop-hook invariants.
+  - Frontend uses `ad.image_proxy_url` / `ad.video_proxy_url` from contract instead of building paths from `ad.id`.
+- DS (Digital Security) undercount finally fixed:
+  - Cloaked: 279 → 999 ads (FB web shows 1,400). Root cause: SC pagination capped at 25 pages, Cloaked has 100+. Bumped 25 → 100 → 200.
+  - Guardio: 621 → 1,230 ads.
+  - Control+: 0 → 196 (dead page_id `554471337751787` replaced with `389115614281537`).
+  - KnowBe4 + Alert Marko: page_ids genuinely return 0 from SC. Marked KNOWN_QUIET in sanity-check.
+- Sort UX: default impressions desc, fallback date for nulls. Sort dropdown reduced to two options.
+- Stats bar simplified to one number + sort dropdown.
+- Stuck "Loading preview…" spinner fixed (3 separate bugs: cache-bust on retry, 4s+8s+16s backoff replacing 105s sequence, no `display: none` during retry).
+- Final state: 24 competitors, ~3,000+ DS ads, ~19,000 total ads. 26 invariants in Stop hook.
+
+### Week 4 — Multi-container topology + access audit
+
+**2026-05-04: Identity confusion + cross-repo access pattern**
+- SSH'd as root, but `id`/`whoami`/`sudo` reported `node`. Diagnosis: `LD_PRELOAD=/root/.claude/remote/fakeid.so` is set by the Claude Code Remote runtime (`ccd-cli` wrapper). The shim overrides `getuid()`/`geteuid()` to return 1000.
+  - Reason: Claude Code CLI hard-blocks `--dangerously-skip-permissions` when `getuid() == 0`. fakeid.so is the only override.
+  - Real identity check: `grep ^Uid /proc/$$/status` (Uid: 0 = root) or `LD_PRELOAD= /usr/bin/id` (bypass shim).
+- Mapped GitHub access from inside ai-arena container:
+  - `ai-arena` (public): SSH deploy key works ✓
+  - `ad-spy` (private): deploy key returns "Repository not found" — keys are repo-scoped. PAT in `/home/node/.claude/.git/config` (set up for claude-sync) has admin on all 3 private repos.
+- Confirmed multi-container topology:
+  - `ai-arena` (port 3000, ssh 2222) and `ad-spy` (port 3001, ssh 2223) are SEPARATE Docker containers on the same Hetzner host.
+  - Direct curl from ai-arena to `localhost:3001` does NOT work — separate Docker networks.
+  - The Docker socket is mounted into ai-arena, so `docker exec ad-spy <cmd>` is the bridge.
+- Helper script: `scripts/ad-spy-helpers.sh` — wraps clone/exec/log against the sibling container.
+- Doc audit: unified the two diverged global CLAUDE.md files. Refreshed claude-sync's project_ad_spy.md (was claiming `server.js ~9KB`, no README — wildly stale). Cleaned TASKS.md. Pushed CHANGELOG entry.
+
+**Live state at 2026-05-04:**
+- ai-arena: up 4 weeks, healthy. Hosts the multi-model comparison app on Railway.
+- ad-spy: up 6 days, healthy. 24 competitors tracked, 19,304 ads cached, 3,520 images cached.
+- 26+ Stop-hook invariants enforce the architecture.
 
 ---
 
@@ -415,6 +486,7 @@ ai-arena/
 
 ## What's Next
 
-- **Ad Intelligence Tool** — Facebook Ad Library analysis for trending ads + funnel tracking (research complete, API access pending)
-- **Voice input improvements** — currently Whisper; could add Web Speech API as offline fallback
-- **Multi-platform** — TikTok Creative Center, Google Ads Transparency Center
+- **Ad Spy Phase 2 — calibrated scoring**: replace heuristic ad-strength scoring with a model trained on Alex's own ad performance data (spend, impressions, CTR, conversions, ROAS). Niche-specific empirical signal beats generic industry heuristics. Needs `ads_read` on Alex's own ad account.
+- **Cross-platform ad spy**: TikTok Creative Center, Google Ads Transparency Center.
+- **Project discriminator for per-cwd memory**: claude-sync's per-cwd memory under `projects/-workspace/` loads anytime cwd is `/workspace`, even if it's a different project (ad-spy's container also has cwd `/workspace`). Plan: discriminate by `git remote get-url origin`, store memory under `projects/by-repo/<owner>-<name>/`.
+- **Voice input improvements** — currently Whisper; could add Web Speech API as offline fallback.

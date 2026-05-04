@@ -17,7 +17,9 @@ SSH keys must be authorized in the container. The devcontainer setup copies keys
 
 ### Heads-up: `whoami` lies when SSH'd as root
 
-The Claude Code Remote runtime sets `LD_PRELOAD=/root/.claude/remote/fakeid.so` for every spawned process. The shim makes libc-based tools (`id`, `whoami`, `sudo`) report uid 1000 (`node`) even when the kernel-side process is genuinely uid 0 (`root`). Reason: tools that gatekeep on uid (npm warnings, soffice, some skills) work without complaints.
+`/root/.claude/remote/fakeid.so` is `LD_PRELOAD`-injected into every process spawned by the Claude Code Remote runtime (`ccd-cli` wrapper). It overrides `getuid()`/`geteuid()` to return 1000, so libc-based tools (`id`, `whoami`, `sudo`) report `node` even when the kernel-side process is real `uid 0`.
+
+**Why it exists**: Claude Code CLI hard-blocks `--dangerously-skip-permissions` when `getuid() == 0` — there's no flag to override. The shim is the only way to run YOLO-mode Claude Code as root while keeping actual root capabilities. See `.claude/ROOT-SSH-SETUP.md` for the full setup (Dockerfile build, wrapper layer, recovery).
 
 **To check the real identity**, look at the kernel, not libc:
 ```bash
