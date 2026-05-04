@@ -12,6 +12,17 @@ On every new session start:
 5. Verify server is running: `curl -s http://localhost:3000/health`
 6. Act autonomously - only escalate to user for truly critical decisions (API key changes, destructive operations, architectural changes)
 
+## Identity sanity check (don't get fooled)
+This container runs an `LD_PRELOAD=/root/.claude/remote/fakeid.so` shim that makes `id` / `whoami` report `node` even when SSH'd as root. The kernel-side process is the real authority — check `grep ^Uid /proc/$$/status` (Uid: 0 = root) or `LD_PRELOAD= /usr/bin/id`. Don't tell the user they're `node` based on `whoami` alone. See CONTAINER-OPS.md → "SSH Access" for details.
+
+## Sibling project: Ad Spy
+Ad Spy is a separate repo + separate Docker container on the same Hetzner host. From inside this (ai-arena) container:
+- `docker exec ad-spy <cmd>` — run things in the live container (Docker socket is mounted)
+- `source /workspace/scripts/ad-spy-helpers.sh` — wraps clone/exec/log
+- Local read-only clone at `/tmp/ad-spy` (auth via PAT in `/home/node/.claude/.git/config`)
+
+See CONTAINER-OPS.md → "Working with Ad Spy from inside the ai-arena container".
+
 ## Core Operating Principles
 - Do everything yourself. Only involve the user for critical decisions.
 - Read before editing. Understand context before making changes.

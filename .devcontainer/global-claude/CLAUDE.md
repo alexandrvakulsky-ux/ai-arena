@@ -15,10 +15,15 @@ YOU WORK FOR ALEX. This file is your bootstrap. Read it fully before doing anyth
 ### If /workspace/ DOES NOT exist (new machine, broken container, fresh install):
 YOU MUST bootstrap. Run these commands yourself without asking:
 ```bash
+# 1. Clone the project — this has ALL docs, configs, scripts, session history
 git clone https://github.com/alexandrvakulsky-ux/ai-arena.git /tmp/ai-arena-docs
+
+# 2. Read the critical files
 cat /tmp/ai-arena-docs/.claude/CLAUDE.md
 cat /tmp/ai-arena-docs/.claude/CONTAINER-OPS.md
 ls -t /tmp/ai-arena-docs/.claude/sessions/*.md | head -3 | xargs cat
+
+# 3. Now you have full context. Follow CONTAINER-OPS.md to recover/rebuild.
 ```
 
 ### If git clone fails (no git, no network):
@@ -32,15 +37,26 @@ Tell Alex: "I need access to https://github.com/alexandrvakulsky-ux/ai-arena to 
 - **Rules**: `.claude/rules/` (security.md, deployment.md, workflow.md)
 - **Container setup**: `.devcontainer/` (Dockerfile, post-create.sh, post-start.sh)
 - **Scripts**: `scripts/` (rebuild-container.sh, new-machine-setup.sh, etc.)
-- **Engineering log**: `docs/PROJECT-HISTORY.md` (20 hardest problems solved, architecture decisions, persistence model — read this when stuck on infra/container/auth issues)
 
 ## INFRASTRUCTURE QUICK REFERENCE
-- **Hetzner VPS**: 135.181.153.92
+- **Hetzner VPS**: 135.181.153.92 — runs TWO sibling containers
+  - `ai-arena` — port 3000 (app), 2222 (ssh). Where you usually land.
+  - `ad-spy`  — port 3001 (app), 2223 (ssh). Reachable from ai-arena via `docker exec ad-spy <cmd>` (Docker socket is mounted) — **not** via direct curl.
 - **SSH into container**: port 2222 (maps to 22 inside), users: node, root
-- **App**: port 3000 (Express/Node)
 - **Deploy**: Railway auto-deploys from main branch
 - **Docker volumes** (survive rebuild): ai-arena-claude-config, ai-arena-bashhistory, ai-arena-puppeteer-cache
-- **GitHub deploy key**: stored on persistent volume at /home/node/.claude/github-deploy-key
+- **GitHub repos** (alexandrvakulsky-ux):
+  - `ai-arena` — public. SSH deploy key at `/root/.ssh/github-deploy-key` and `/home/node/.claude/github-deploy-key` (deploy keys are repo-scoped — they can ONLY clone/push ai-arena, not ad-spy).
+  - `ad-spy` — private. Use the owner-scoped PAT: `grep -oE 'github_pat_[A-Za-z0-9_]+' /home/node/.claude/.git/config | head -1` — that PAT reads all of Alex's private repos.
+  - `claude-sync` — private. Same PAT.
+
+## ROOT vs NODE — DON'T GET FOOLED
+When SSH'd as root into either container, libc-based tools (`id`, `whoami`, `sudo`) report `node` (uid 1000) because of `LD_PRELOAD=/root/.claude/remote/fakeid.so` set by the Claude Code Remote runtime. The kernel-side process IS uid 0 — verify with:
+```bash
+grep ^Uid /proc/$$/status        # 0 = real root
+LD_PRELOAD= /usr/bin/id          # bypasses the shim
+```
+If you see `$USER=root` and `$HOME=/root` but `whoami=node`, you ARE root. Don't tell Alex he's `node` — that'll waste a turn. The shim is intentional (lets npm/soffice/etc. run without root warnings).
 
 ## CORE PRINCIPLES — ALWAYS APPLY
 - Do everything yourself. Only involve Alex for critical decisions (API keys, money, destructive ops).
@@ -48,12 +64,16 @@ Tell Alex: "I need access to https://github.com/alexandrvakulsky-ux/ai-arena to 
 - Read before editing. Understand context before changing anything.
 - Verify after changes. Run tests, check endpoints, confirm behavior.
 - Document findings. Update session notes in .claude/sessions/ after significant work.
+- Keep the container clean. Watch for zombie processes, stale files, resource leaks.
 
 ## PAST MISTAKES — DON'T REPEAT THESE
-- **Zombie processes**: PID 1 was `tail -f /dev/null` → 1200+ zombies. Fix: --init flag + sleep infinity.
-- **GitHub auth lost on rebuild**: was using HTTPS remote. Fix: SSH deploy key on persistent volume.
-- **Claude auth lost on rebuild**: Fix: two-way sync between volume and /workspace/.claude-credentials.json.
-- **Root wrapper cascade**: wrap_cli_binaries() kept re-wrapping `.real` files. Fix: skip `*.real` + `#!` guard.
+- **Zombie processes**: PID 1 was `tail -f /dev/null` → 1200+ zombies. Fix: --init flag in Docker runArgs.
+- **GitHub auth lost on rebuild**: was using HTTPS remote + no credential helper. Fix: SSH deploy key on persistent volume, auto-configured by post-start.sh.
+- **Claude auth lost on rebuild**: credentials not backed up. Fix: two-way sync between volume and /workspace/.claude-credentials.json, auto-backup every 30min.
+- **Session amnesia**: no context between sessions. Fix: save-session.js runs on Stop hook, session-context.sh runs on SessionStart hook.
+- **Global config lost**: ~/.claude/CLAUDE.md didn't exist. Fix: post-create.sh copies from repo, post-start.sh verifies.
+- **Ad-spy "Repository not found"**: the ai-arena deploy key is repo-scoped — it CANNOT clone ad-spy. Symptom: `git clone git@github.com:alexandrvakulsky-ux/ad-spy.git` fails with "Repository not found" even though the repo exists. Fix: use the PAT (see Infra Quick Reference) over HTTPS, or `source /workspace/scripts/ad-spy-helpers.sh` and call `ad_spy_sync_local`.
+- **Trusting `whoami` over `/proc`**: see "ROOT vs NODE" above. The kernel-side uid is the truth.
 
 ## WHO ALEX IS
 - Building AI Arena: multi-model comparison app (Claude vs GPT-4o vs Gemini)
@@ -65,11 +85,30 @@ Tell Alex: "I need access to https://github.com/alexandrvakulsky-ux/ai-arena to 
 - **Terse responses** — no preamble, no trailing summaries
 - **Show evidence** before asking if something looks right
 - **Smallest change** that solves the problem — no scope creep
+- **Ask one clarifying question** if the request is ambiguous — don't guess
 
 ## UNIVERSAL CODE RULES
 - No TypeScript — vanilla JS/Node only unless explicitly asked
 - No new dependencies without asking first
 - No build steps unless the project already uses them
+- No comments added to code I didn't change
+
+## AFTER FINISHING ANY TASK
+1. Gather evidence (screenshot, test run, or curl)
+2. Show the evidence
+3. Ask: "Does this match what you expected?"
+
+## CONTEXT HYGIENE
+- Run `/compact` before starting a large task if context feels heavy
+- Use the `reviewer` sub-agent after non-trivial changes
+- Use skills instead of ad-hoc verification
+
+## SKILL MAINTENANCE (mandatory)
+
+Skills are living documents. Update immediately when:
+- A mistake happens that the skill should have caught
+- A correction comes from the user
+- A new pattern emerges across 2+ sessions
 
 ## SKILL ROUTING (apply automatically)
 

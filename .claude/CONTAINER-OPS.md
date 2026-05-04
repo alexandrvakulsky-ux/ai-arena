@@ -15,6 +15,18 @@ ssh -p 2222 root@135.181.153.92
 
 SSH keys must be authorized in the container. The devcontainer setup copies keys during post-create.
 
+### Heads-up: `whoami` lies when SSH'd as root
+
+The Claude Code Remote runtime sets `LD_PRELOAD=/root/.claude/remote/fakeid.so` for every spawned process. The shim makes libc-based tools (`id`, `whoami`, `sudo`) report uid 1000 (`node`) even when the kernel-side process is genuinely uid 0 (`root`). Reason: tools that gatekeep on uid (npm warnings, soffice, some skills) work without complaints.
+
+**To check the real identity**, look at the kernel, not libc:
+```bash
+grep -E "^Uid|^CapEff" /proc/$$/status   # Uid: 0 = real root
+LD_PRELOAD= /usr/bin/id                  # bypasses the shim
+```
+
+If you see `$USER=root`, `$HOME=/root`, but `whoami=node`: you're root. Don't waste a turn re-verifying.
+
 ### Troubleshooting SSH
 - **Connection refused:** SSH daemon may not be running. Check with `docker exec` from the host, then `service ssh start`.
 - **Permission denied:** Check `~/.ssh/authorized_keys` inside the container for the correct public key.
@@ -36,7 +48,31 @@ SSH keys must be authorized in the container. The devcontainer setup copies keys
 
 Ad Spy workspace bind mount: `/srv/ad-spy` → `/workspace`
 Puppeteer cache volume: `ad-spy-puppeteer-cache`
-**Repo:** `git@github.com:alexandrvakulsky-ux/ad-spy.git` — the ad-spy container has its own git clone at `/workspace` with SSH deploy key at `~/.ssh/github-deploy-key`. To commit changes: `docker exec ad-spy sh -c "cd /workspace && git add <files> && git commit -m '...' && git push"`. Source files to deploy live on host at `/srv/ad-spy/` (bind-mounted) — after editing on host, copy into container with `docker cp` and then commit from inside.
+**Repo:** `git@github.com:alexandrvakulsky-ux/ad-spy.git` (private). The ad-spy container has its own git clone at `/workspace` with SSH deploy key at `~/.ssh/github-deploy-key`. To commit changes: `docker exec ad-spy sh -c "cd /workspace && git add <files> && git commit -m '...' && git push"`. Source files to deploy live on host at `/srv/ad-spy/` (bind-mounted) — after editing on host, copy into container with `docker cp` and then commit from inside.
+
+### Working with Ad Spy from inside the ai-arena container
+
+The Docker socket (`/var/run/docker.sock`) is mounted into ai-arena, so from this container you can drive the sibling ad-spy container directly:
+
+```bash
+docker ps                          # both containers visible
+docker exec ad-spy <cmd>           # run anything in ad-spy
+docker exec ad-spy curl -s localhost:3001/health
+```
+
+Direct network reach (`curl ad-spy:3001`, `curl localhost:3001`) does **not** work from inside ai-arena — the containers are on separate networks. Use docker exec.
+
+For read-only review of the ad-spy source from this container, use the helper:
+```bash
+source /workspace/scripts/ad-spy-helpers.sh
+ad_spy_sync_local        # clones / fast-forwards /tmp/ad-spy
+ad_spy_exec git log -5   # against the live container
+ad_spy_log 100           # tail server.log
+```
+
+The helper authenticates via a GitHub PAT extracted from `/home/node/.claude/.git/config` (the claude-sync clone). That PAT is owner-scoped — it can read all of alexandrvakulsky-ux's private repos, including ad-spy. The volume is named (`ai-arena-claude-config`), so the PAT survives container rebuilds.
+
+`/tmp/ad-spy` itself is **ephemeral** — `/tmp` is wiped on container rebuild. Re-cloning takes ~2s; don't write anything you care about there.
 
 ### Ad Spy operations runbook
 
