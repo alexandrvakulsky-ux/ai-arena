@@ -227,6 +227,30 @@ check "adspy:video-audit-uses-per-comp-caches" \
   "WATCHLIST_FILE|COMP_CACHE_DIR" \
   "verify-video-detection.js must load ads by walking per-competitor caches (the post-2026-04-22 architecture). Otherwise the daily video-drift audit silently no-ops and detection bugs go unnoticed for weeks (P1 fix 2026-05-04)"
 
+# 2026-05-05 — Daily competitive brief feature (generate-brief.js).
+# Pin the cost-control + correctness contracts so the new feature can't
+# silently regress: no setInterval (idle=$0 rule), prompt caching wired,
+# kill switch reachable, daily-fire gate aligned with maybeRunDailyAudit.
+check_not "adspy:brief-no-setinterval" \
+  "/srv/ad-spy/scripts/generate-brief.js" \
+  "setInterval" \
+  "generate-brief.js must NOT use setInterval — violates the idle=\$0 cost rule. Use the date-stamp gate via maybeRunDailyBrief() in server.js instead (cost-control 2026-05-05)"
+
+check "adspy:brief-uses-prompt-caching" \
+  "/srv/ad-spy/scripts/generate-brief.js" \
+  "cache_control.*ephemeral" \
+  "generate-brief.js must include cache_control: {type: 'ephemeral'} on the system prompt. Without prompt caching the per-day cost is 4-5x higher and manual /api/brief/regenerate refreshes pay full input cost. First codebase use of caching — keep it (cost-control 2026-05-05)"
+
+check "adspy:brief-respects-kill-switch" \
+  "/srv/ad-spy/server.js" \
+  "AD_SPY_DISABLE_BRIEF" \
+  "server.js must check AD_SPY_DISABLE_BRIEF env var as a kill switch in maybeRunDailyBrief (and the brief endpoints). Mirrors AD_SPY_DISABLE_PAID_AUDITS pattern. Cost-control insurance for when ad-spy stays online but Alex doesn't want to spend on briefs (2026-05-05)"
+
+check "adspy:brief-fires-on-user-activity" \
+  "/srv/ad-spy/server.js" \
+  "maybeRunDailyBrief\\(\\)" \
+  "server.js must call maybeRunDailyBrief() from markUserActivity(). This is the daily-fire trigger; without it the brief never auto-generates and the Today tab is permanently stale (architectural rule 2026-05-05)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
