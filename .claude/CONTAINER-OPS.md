@@ -114,7 +114,21 @@ Costs ~$1-2 per run. Do it when you suspect undercount for a brand.
 - `MAX_FIRST_CALL_RETRIES` — 6 retries for SC empty-response flakiness
 - 1.5s mandatory delay between page_ids within one competitor's fetch
 - `IDLE_THRESHOLD_MS` — 2h; if no user activity in this window, skip background refreshes entirely
-- `AD_SPY_DISABLE_PAID_AUDITS=1` env var — disables the ~$1/day daily audits
+
+**Kill-switch env vars** (set in `/srv/ad-spy/.env` to disable):
+- `AD_SPY_DISABLE_PAID_AUDITS=1` — skips the daily video-detection + coverage audits (~$1/day)
+- `AD_SPY_DISABLE_BRIEF=1` — skips the daily competitive brief (~$0.15-0.30/day, fires 90s after first user activity each day)
+
+**Today tab + competitive brief** (added 2026-05-05):
+- `GET /api/brief/today` (auth-gated) — returns today's markdown brief + metadata. Falls back to the latest prior brief if today's isn't ready yet.
+- `POST /api/brief/regenerate` (auth-gated, 90s in-process cooldown) — force a regeneration.
+- Brief artifacts live at `/srv/ad-spy/.cache/briefs/YYYY-MM-DD.md` + `_latest.json`. `.cache/` is gitignored.
+- Brief fires on first user activity each day via `maybeRunDailyBrief()` gating on `.cache/_last_brief.txt`. Mirrors the existing daily-audit pattern. Generator script: `scripts/generate-brief.js`.
+
+**Cross-page association** (added 2026-05-11):
+- `GET /api/clusters?min_pages=2&new_only=true` (auth-gated) — clusters tracked + un-tracked FB page_ids by shared destination domain. Surfaces hidden personas. $0 — reads cache only, no SC fetches. Computed in-process (~100ms walk).
+- Script: `scripts/find-page-clusters.js`. Also runnable as a CLI for the readable report.
+- Shared cache loader: `lib/cache-walk.js` (new canonical pattern; scripts should require this rather than re-implementing watchlist iteration).
 
 **Architecture**: per-competitor lazy-fetch. Each competitor has its own `.cache/comp/{slug}.json` file with independent 4h TTL. Sidebar counts read these files directly without triggering fetches. Endpoint requests only fetch the competitors their filter actually needs. No more global cache wipe = no more cascading data loss.
 

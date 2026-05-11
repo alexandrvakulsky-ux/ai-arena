@@ -262,8 +262,18 @@ check "adspy:clusters-endpoint-auth-gated" \
 
 check "adspy:clusters-reads-per-comp-caches" \
   "/srv/ad-spy/scripts/find-page-clusters.js" \
-  "COMP_CACHE_DIR|/workspace/\\.cache/comp" \
-  "find-page-clusters.js must read per-competitor caches (post-2026-04-22 architecture), not any legacy global ad cache. Otherwise clusters become a stale point-in-time view (2026-05-11)"
+  "lib/cache-walk|COMP_CACHE_DIR|/workspace/\\.cache/comp" \
+  "find-page-clusters.js must read per-competitor caches (post-2026-04-22 architecture), not any legacy global ad cache. The canonical loader is lib/cache-walk.js (introduced 2026-05-11); direct path use is also accepted for backward compatibility (2026-05-11)"
+
+# 2026-05-11 — Brief gate self-heal: if the process restarts during the 90s
+# delay window between marking the stamp and spawning the script, today's
+# brief silently never generates. Self-heal: on next-day startup, if the
+# stamp says today but the brief file is missing, clear the stamp so the
+# next user activity retries.
+check "adspy:brief-gate-self-heals-from-restart" \
+  "/srv/ad-spy/server.js" \
+  "stamp claims today but brief file missing" \
+  "maybeRunDailyBrief() must detect 'stamp written but brief file missing' and clear the stamp. Otherwise a Railway redeploy or OOM during the 90s delay silently skips the day's brief (P1 fix 2026-05-11)"
 
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
