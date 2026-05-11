@@ -251,6 +251,20 @@ check "adspy:brief-fires-on-user-activity" \
   "maybeRunDailyBrief\\(\\)" \
   "server.js must call maybeRunDailyBrief() from markUserActivity(). This is the daily-fire trigger; without it the brief never auto-generates and the Today tab is permanently stale (architectural rule 2026-05-05)"
 
+# 2026-05-11 — Cross-page association endpoint exposes cluster data
+# (which page_ids share a destination domain, including ad operator's
+# identity hints). Must stay behind requireAuth — competitors could use
+# this to map our watchlist + un-tracked persona signals.
+check "adspy:clusters-endpoint-auth-gated" \
+  "/srv/ad-spy/server.js" \
+  "app\\.get\\('/api/clusters', requireAuth" \
+  "GET /api/clusters must be guarded by requireAuth — this endpoint surfaces persona-cluster intelligence (which un-tracked FB pages share a domain with which tracked competitors). Exposing publicly would leak the operator-identity-mapping signal (security rule 2026-05-11)"
+
+check "adspy:clusters-reads-per-comp-caches" \
+  "/srv/ad-spy/scripts/find-page-clusters.js" \
+  "COMP_CACHE_DIR|/workspace/\\.cache/comp" \
+  "find-page-clusters.js must read per-competitor caches (post-2026-04-22 architecture), not any legacy global ad cache. Otherwise clusters become a stale point-in-time view (2026-05-11)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
