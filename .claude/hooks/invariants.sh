@@ -102,7 +102,18 @@ check "adspy:sc-deep-pagination-cap" \
 check "adspy:sc-refetch-interval-le-4h" \
   "/srv/ad-spy/server.js" \
   "SC_REFETCH_INTERVAL = [1-4] \* 60 \* 60 \* 1000" \
-  "SC_REFETCH_INTERVAL must be <= 4h. 24h caused data loss: SC-sourced ads got wiped on cache rebuild (bug fixed 2026-04-17)"
+  "SC_REFETCH_INTERVAL must be <= 4h. 24h caused data loss: SC-sourced ads got wiped on cache rebuild (bug fixed 2026-04-17). NOTE: SC_REFETCH_INTERVAL is a tombstone constant; the active knob is COMP_TTL_MS — see adspy:comp-ttl-le-8h"
+
+# 2026-05-12 — Cap the active per-comp cache TTL. The architectural fix from
+# 2026-04-17 (per-competitor caching with mergeFreshWithPrev) means the
+# original 24h-data-wipe bug can't recur. But an inflated TTL still erodes
+# data freshness — the daily brief and "last 24h" view assume cache is at
+# most ~half a day stale. 8h is the current balance between cost ($) and
+# freshness; do not push past without explicit conversation about both.
+check "adspy:comp-ttl-le-8h" \
+  "/srv/ad-spy/server.js" \
+  "COMP_TTL_MS = [1-8] \* 60 \* 60 \* 1000" \
+  "COMP_TTL_MS must be <= 8h. Higher values silently age the brief's '24h delta' view + risk the '[adspy] is showing yesterday's data' regression. If a future change needs longer TTL, also update the brief's freshness assumptions (2026-05-12)"
 
 check "adspy:puppeteer-date-normalization" \
   "/srv/ad-spy/scrape-ad-library.js" \
