@@ -275,6 +275,39 @@ check "adspy:brief-gate-self-heals-from-restart" \
   "stamp claims today but brief file missing" \
   "maybeRunDailyBrief() must detect 'stamp written but brief file missing' and clear the stamp. Otherwise a Railway redeploy or OOM during the 90s delay silently skips the day's brief (P1 fix 2026-05-11)"
 
+# 2026-05-12 — SC cost optimizations triggered by 25k-credit single-day
+# overage. Three structural pieces protect against regression:
+#
+# (a) Shared SC tracking module so both server runtime fetches and audit
+#     fetches count into the same file. Without this, audit-script credit
+#     spend becomes invisible.
+check "adspy:sc-tracking-used-by-server" \
+  "/srv/ad-spy/server.js" \
+  "lib/sc-tracking" \
+  "server.js must require lib/sc-tracking for SC call counting + quiet detection. Re-implementing the counter in server.js leaves audit-script spend invisible (2026-05-12)"
+
+check "adspy:sc-tracking-used-by-audit" \
+  "/srv/ad-spy/scripts/verify-competitor-coverage.js" \
+  "lib/sc-tracking" \
+  "verify-competitor-coverage.js must require lib/sc-tracking so its SC calls are counted alongside server's. Without this, the audit script could silently use 100s of credits unseen (2026-05-12)"
+
+# (b) Quiet-page-aware fetch: page_ids that have been empty 3+ times in a
+#     row must skip the 6-retry empty-response policy. Otherwise chronically
+#     empty pages (KnowBe4 etc.) burn 7 SC calls per refresh returning nothing.
+check "adspy:sc-fetch-respects-quiet-pages" \
+  "/srv/ad-spy/server.js" \
+  "isPageQuiet" \
+  "fetchAdsViaScrapeCreators must check isPageQuiet(pageId) and skip retries on quiet pages. Without this, chronically-empty page_ids burn 7 SC calls per refresh × multiple refreshes/day (2026-05-12)"
+
+# (c) Coverage audit must skip probes for page_ids with healthy recent cache.
+#     Without this, the daily audit re-probes everything regardless of cache
+#     state — wasteful at scale (e.g., ~84 SC calls/day for confirmed-healthy
+#     page_ids that don't need confirmation).
+check "adspy:coverage-audit-skips-healthy" \
+  "/srv/ad-spy/scripts/verify-competitor-coverage.js" \
+  "skippedHealthy|HEALTHY_AD_THRESHOLD" \
+  "verify-competitor-coverage.js must skip probes for page_ids with healthy recent cache (≥20 ads + cache <7d old). Without this, the daily audit re-probes 80+ healthy page_ids that need no confirmation (2026-05-12)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
