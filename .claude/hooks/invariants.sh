@@ -335,6 +335,14 @@ check "adspy:access-log-endpoints-auth-gated" \
   "app\\.get\\('/api/access-(stats|log)', requireAuth" \
   "/api/access-stats and /api/access-log must stay behind requireAuth — they expose IPs, paths, and user-agents of every visitor (2026-05-25)"
 
+# Access log gets pushed to GitHub daily (logs/access.jsonl) so it's
+# backed up off-host + readable without SSH. Same daily-gate pattern as
+# brief + audit. Fires from markUserActivity().
+check "adspy:access-log-pushed-daily" \
+  "/srv/ad-spy/server.js" \
+  "maybeRunDailyLogPush\\(\\)" \
+  "server.js must call maybeRunDailyLogPush() from markUserActivity() so the access log gets backed up to GitHub. Without it, log is local-only and dies with the container (2026-05-25)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
