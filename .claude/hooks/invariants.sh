@@ -319,6 +319,22 @@ check "adspy:coverage-audit-skips-healthy" \
   "skippedHealthy|HEALTHY_AD_THRESHOLD" \
   "verify-competitor-coverage.js must skip probes for page_ids with healthy recent cache (≥20 ads + cache <7d old). Without this, the daily audit re-probes 80+ healthy page_ids that need no confirmation (2026-05-12)"
 
+# 2026-05-25 — Access log middleware. Without it we cannot answer "did anyone
+# visit?" after the fact — only inferred from secondary signals (SC counter,
+# brief-stamp date) which underreport silent visits (/health probes, scanner
+# traffic, auth-failures from invalid keys). Middleware writes JSONL to
+# _access.log; /api/access-stats + /api/access-log expose it. Both endpoints
+# are auth-gated.
+check "adspy:access-log-middleware-present" \
+  "/srv/ad-spy/server.js" \
+  "ACCESS_LOG_FILE|fs\\.appendFile.*_access\\.log" \
+  "server.js must include the lightweight access-log middleware (writes JSONL line per request to .cache/_access.log). Without it, request-level visibility is gone and we're back to 'we can't tell if anyone used it' (2026-05-25)"
+
+check "adspy:access-log-endpoints-auth-gated" \
+  "/srv/ad-spy/server.js" \
+  "app\\.get\\('/api/access-(stats|log)', requireAuth" \
+  "/api/access-stats and /api/access-log must stay behind requireAuth — they expose IPs, paths, and user-agents of every visitor (2026-05-25)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
