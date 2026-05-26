@@ -346,10 +346,10 @@ check "adspy:access-log-pushed-daily" \
 # 2026-05-26 — Completeness audit. Daily SC search-by-name across all
 # 24 brands, classifies returned ads by (page_id, landing domain) to
 # find untracked pages running ads to brands we track. ~$0.30/day.
-check "adspy:completeness-audit-runs-daily" \
+check "adspy:weekly-discovery-runs" \
   "/srv/ad-spy/server.js" \
-  "maybeRunDailyCompleteness\\(\\)" \
-  "server.js must call maybeRunDailyCompleteness() from markUserActivity() so we get a daily coverage_score per brand and surface untracked pages running ads to our brands' owned domains. Without it, we go back to 'we don't know what we don't know' (2026-05-26)"
+  "maybeRunWeeklyDiscovery\\(\\)" \
+  "server.js must call maybeRunWeeklyDiscovery() from markUserActivity(). This is the combined weekly completeness audit + auto-add pass — brands don't launch persona pages daily, so finding and acting MUST happen on the same cadence or we're either burning credits unnecessarily or sitting on stale findings (2026-05-26 → consolidated 2026-05-26)"
 
 check "adspy:completeness-uses-sc-tracking" \
   "/srv/ad-spy/scripts/completeness-audit.js" \
@@ -375,10 +375,19 @@ check "adspy:auto-add-spam-filtered" \
   "BLOCKLIST_NAME_TERMS|looksSpam" \
   "auto-add-pages.js must skip pages whose names match fiction/novel/drama/etc. blocklist patterns. These keyword-stuff brand names into ad copy; adding them pollutes the cache (2026-05-26)"
 
-check "adspy:auto-add-runs-weekly" \
+# 2026-05-26 — FB token health monitor. The token died silently for 2
+# weeks before anyone noticed (password change / Meta security event).
+# This check is gated to fire every ~6h and writes a dead-flag file +
+# loud log line on failure. Exposed via /api/token-health.
+check "adspy:fb-token-monitored" \
   "/srv/ad-spy/server.js" \
-  "maybeRunWeeklyAutoAdd\\(\\)" \
-  "server.js must call maybeRunWeeklyAutoAdd() from markUserActivity() so the watchlist actually grows without manual intervention. Otherwise the completeness audit surfaces findings that never get acted on (2026-05-26)"
+  "maybeCheckFbToken\\(\\)" \
+  "server.js must call maybeCheckFbToken() from markUserActivity(). Without it the FB token dies silently and /api/discover breaks for weeks (2026-05-26)"
+
+check "adspy:token-health-endpoint-exists" \
+  "/srv/ad-spy/server.js" \
+  "/api/token-health" \
+  "server.js must expose /api/token-health so token state is queryable without log-scraping. Without the endpoint, the dead-flag file is hidden inside the container (2026-05-26)"
 
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
