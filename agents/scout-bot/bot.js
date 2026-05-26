@@ -276,15 +276,17 @@ const SCOUTS = {
   },
 };
 
+const FIRE_HOUR_UTC = parseInt(process.env.SCOUT_FIRE_HOUR_UTC || '9', 10);
 function startScheduler() {
+  console.log(`[scheduler] will fire scouts at ${FIRE_HOUR_UTC}:00 UTC on Mon + Thu`);
   setInterval(async () => {
     const now = new Date();
-    const day = now.getDay();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
+    // Use UTC consistently — container is UTC, simpler than juggling local TZ.
+    const day = now.getUTCDay();
+    const hour = now.getUTCHours();
+    const minute = now.getUTCMinutes();
 
-    // Fire at exactly :00 of 09:00 local. Avoid double-fire by stamping yyyy-mm-dd-hh.
-    if (hour !== 9 || minute !== 0) return;
+    if (hour !== FIRE_HOUR_UTC || minute !== 0) return;
     if (!SCOUTS[day]) return;
     const key = `${now.toISOString().slice(0, 10)}-${hour}`;
     if (lastFiredKey === key) return;
