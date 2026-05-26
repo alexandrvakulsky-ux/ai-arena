@@ -8,3 +8,5 @@ npm-debug.log*
 # Scout bot per-chat state — contains chat IDs + conversation history
 agents/scout-bot/chats/
 agents/scout-bot/.authorized_chat.txt
+agents/scout-bot/.bot-state.json
+agents/scout-bot/journal.md
