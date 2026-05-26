@@ -375,19 +375,11 @@ check "adspy:auto-add-spam-filtered" \
   "BLOCKLIST_NAME_TERMS|looksSpam" \
   "auto-add-pages.js must skip pages whose names match fiction/novel/drama/etc. blocklist patterns. These keyword-stuff brand names into ad copy; adding them pollutes the cache (2026-05-26)"
 
-# 2026-05-26 — FB token health monitor. The token died silently for 2
-# weeks before anyone noticed (password change / Meta security event).
-# This check is gated to fire every ~6h and writes a dead-flag file +
-# loud log line on failure. Exposed via /api/token-health.
-check "adspy:fb-token-monitored" \
-  "/srv/ad-spy/server.js" \
-  "maybeCheckFbToken\\(\\)" \
-  "server.js must call maybeCheckFbToken() from markUserActivity(). Without it the FB token dies silently and /api/discover breaks for weeks (2026-05-26)"
-
-check "adspy:token-health-endpoint-exists" \
-  "/srv/ad-spy/server.js" \
-  "/api/token-health" \
-  "server.js must expose /api/token-health so token state is queryable without log-scraping. Without the endpoint, the dead-flag file is hidden inside the container (2026-05-26)"
+# 2026-05-26 — Both fb-token-monitored and token-health-endpoint invariants
+# REMOVED in same-day cleanup. Live system no longer depends on Meta Graph
+# API (Discover migrated to SC; completeness was on SC from day one).
+# Token monitor was a canary for nothing, so it got ripped. If a future
+# Meta-direct feature is added, re-add health monitoring invariants then.
 
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
