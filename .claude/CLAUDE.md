@@ -33,7 +33,7 @@ See CONTAINER-OPS.md → "Working with Ad Spy from inside the ai-arena container
 ## Stack
 - **Backend:** Node.js + Express (`server.js`)
 - **Frontend:** Vanilla JS/HTML (`public/index.html`) — no build step, no framework
-- **Deploy:** Hetzner VPS (http://135.181.153.92:3000). `scripts/prod-supervisor.sh` polls `origin/main` every 60s and pulls + restarts on new commits; restarts `node server.js` on crash. Railway hosting was retired 2026-05-26.
+- **Deploy:** Hetzner VPS at http://135.181.153.92:3000 (Railway retired 2026-05-26). To ship: SSH in, `git pull`, `pkill -f 'node server.js'; nohup node server.js >> /workspace/server.log 2>&1 & disown`.
 - **Local dev:** `npm start` → http://localhost:3000
 
 ## Environment variables

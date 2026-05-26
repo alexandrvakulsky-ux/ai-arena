@@ -47,28 +47,19 @@ You can work entirely in GitHub without a local clone:
 
 ## Deploying to the web
 
-### Production (active): Hetzner VPS
-Lives at **http://135.181.153.92:3000**. Runs inside the `ai-arena`
-Docker container on the same Hetzner host as ad-spy.
+Production runs on a Hetzner VPS at **http://135.181.153.92:3000**
+(inside the `ai-arena` Docker container, same host as ad-spy).
+Railway hosting was retired on 2026-05-26.
 
-Auto-deploy is handled by `scripts/prod-supervisor.sh`:
-- Polls `origin/main` every 60s; on a new commit, pulls + restarts.
-- Auto-restarts `node server.js` on crash (3s backoff).
-- Logs to `/workspace/server.log` (append-mode).
-
-To start the supervisor after a container rebuild:
+To deploy after pushing to `main`:
 ```bash
-nohup bash /workspace/scripts/prod-supervisor.sh > /workspace/supervisor.log 2>&1 &
-disown
+ssh -p 2222 root@135.181.153.92
+cd /workspace && git pull && pkill -f 'node server.js'
+nohup node server.js >> /workspace/server.log 2>&1 & disown
 ```
 
-### Other free hosts (if self-hosting isn't desired)
-- **Render**: New Web Service → connect repo → build `npm install`, start `npm start`.
-- **Fly.io**: `fly launch && fly secrets set ANTHROPIC_API_KEY=... && fly deploy`.
-
-> Railway hosting was retired on 2026-05-26 — the Hetzner deploy is
-> the canonical production now. The old `ai-arena-production-92e7.up.railway.app`
-> URL is no longer maintained.
+Other free hosts if you'd rather not self-host: Render
+(`npm install` / `npm start`), Fly.io (`fly launch` + `fly deploy`).
 
 ---
 
