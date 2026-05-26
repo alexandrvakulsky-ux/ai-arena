@@ -343,6 +343,19 @@ check "adspy:access-log-pushed-daily" \
   "maybeRunDailyLogPush\\(\\)" \
   "server.js must call maybeRunDailyLogPush() from markUserActivity() so the access log gets backed up to GitHub. Without it, log is local-only and dies with the container (2026-05-25)"
 
+# 2026-05-26 — Completeness audit. Daily SC search-by-name across all
+# 24 brands, classifies returned ads by (page_id, landing domain) to
+# find untracked pages running ads to brands we track. ~$0.30/day.
+check "adspy:completeness-audit-runs-daily" \
+  "/srv/ad-spy/server.js" \
+  "maybeRunDailyCompleteness\\(\\)" \
+  "server.js must call maybeRunDailyCompleteness() from markUserActivity() so we get a daily coverage_score per brand and surface untracked pages running ads to our brands' owned domains. Without it, we go back to 'we don't know what we don't know' (2026-05-26)"
+
+check "adspy:completeness-uses-sc-tracking" \
+  "/srv/ad-spy/scripts/completeness-audit.js" \
+  "lib/sc-tracking" \
+  "completeness-audit.js must require lib/sc-tracking so its SC calls count toward the daily total in /api/sc-cost. Otherwise audit spend is invisible (2026-05-26)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
