@@ -70,8 +70,6 @@ REQUIRED_DOMAINS=(
     open-vsx.org api2.cursor.sh authenticate.cursor.sh authenticator.cursor.sh marketplace.cursorapi.com
     # Chrome/Puppeteer downloads (MCP screenshot server)
     storage.googleapis.com googlechromelabs.github.io edgedl.me.gvt1.com
-    # AI Arena production (Railway)
-    ai-arena-production-92e7.up.railway.app
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 

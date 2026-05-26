@@ -47,26 +47,28 @@ You can work entirely in GitHub without a local clone:
 
 ## Deploying to the web
 
-### Option A — Railway (easiest, free tier)
-1. Push this folder to a GitHub repo
-2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
-3. Add your API keys as environment variables in Railway's dashboard
-4. Done — Railway gives you a public URL
+### Production (active): Hetzner VPS
+Lives at **http://135.181.153.92:3000**. Runs inside the `ai-arena`
+Docker container on the same Hetzner host as ad-spy.
 
-### Option B — Render (free tier)
-1. Push to GitHub
-2. Go to [render.com](https://render.com) → New Web Service → connect repo
-3. Build command: `npm install`
-4. Start command: `npm start`
-5. Add env vars in Render's dashboard
+Auto-deploy is handled by `scripts/prod-supervisor.sh`:
+- Polls `origin/main` every 60s; on a new commit, pulls + restarts.
+- Auto-restarts `node server.js` on crash (3s backoff).
+- Logs to `/workspace/server.log` (append-mode).
 
-### Option C — Fly.io
+To start the supervisor after a container rebuild:
 ```bash
-npm install -g flyctl
-fly launch
-fly secrets set ANTHROPIC_API_KEY=sk-ant-... OPENAI_API_KEY=sk-... GOOGLE_API_KEY=AIza-...
-fly deploy
+nohup bash /workspace/scripts/prod-supervisor.sh > /workspace/supervisor.log 2>&1 &
+disown
 ```
+
+### Other free hosts (if self-hosting isn't desired)
+- **Render**: New Web Service → connect repo → build `npm install`, start `npm start`.
+- **Fly.io**: `fly launch && fly secrets set ANTHROPIC_API_KEY=... && fly deploy`.
+
+> Railway hosting was retired on 2026-05-26 — the Hetzner deploy is
+> the canonical production now. The old `ai-arena-production-92e7.up.railway.app`
+> URL is no longer maintained.
 
 ---
 

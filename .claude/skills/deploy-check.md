@@ -1,6 +1,6 @@
 ---
 name: deploy-check
-description: Verify AI Arena is healthy — server responds, all 3 API providers work, git is clean, Railway is in sync. Use after finishing any change or before calling something done.
+description: Verify AI Arena is healthy — server responds, all 3 API providers work, git is clean, Hetzner production matches HEAD. Use after finishing any change or before calling something done.
 tools: Bash
 ---
 
@@ -10,14 +10,16 @@ tools: Bash
 Confirm the app is working end-to-end and the deployment is clean.
 
 ## Production URL
-https://ai-arena-production-92e7.up.railway.app
+http://135.181.153.92:3000 (Hetzner VPS — replaced Railway 2026-05-26)
 
 ## Process
 
-0. **Railway production health**
-   - `curl -s https://ai-arena-production-92e7.up.railway.app/health`
-   - Expect `{"ok":true,...}` — if not, Railway hasn't deployed yet or is down
-   - Compare `git log origin/main --oneline -1` with production response uptime to gauge if latest push is live
+0. **Hetzner production health**
+   - `curl -s http://135.181.153.92:3000/health` (or `curl -s http://localhost:3000/health` from inside the container)
+   - Expect `{"status":"ok",...}` — if not, supervisor or `node server.js` is down
+   - Check the supervisor is alive: `ps aux | grep -E 'prod-supervisor|node /workspace/server.js' | grep -v grep`
+   - If supervisor isn't running, restart with: `nohup bash /workspace/scripts/prod-supervisor.sh > /workspace/supervisor.log 2>&1 & disown`
+   - Latest pull SHA visible in `tail -20 /workspace/supervisor.log` — compare to `git -C /workspace log origin/main --oneline -1` to confirm latest push is live (supervisor polls every 60s)
 
 1. **Server running?**
    - `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`
