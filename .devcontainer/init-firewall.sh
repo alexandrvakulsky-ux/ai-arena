@@ -70,6 +70,33 @@ REQUIRED_DOMAINS=(
     open-vsx.org api2.cursor.sh authenticate.cursor.sh authenticator.cursor.sh marketplace.cursorapi.com
     # Chrome/Puppeteer downloads (MCP screenshot server)
     storage.googleapis.com googlechromelabs.github.io edgedl.me.gvt1.com
+    # Scout sources — added 2026-05-26 for /mcp-scout + /futureproof-scout skills.
+    # These are READ-ONLY browsing targets. If you don't trust the agent to
+    # read these, remove the relevant lines and the corresponding scout will
+    # silently degrade. Keeping the allowlist narrow is the security feature.
+    #
+    # Social / discussion
+    www.reddit.com old.reddit.com api.reddit.com
+    x.com twitter.com api.twitter.com mobile.twitter.com
+    news.ycombinator.com hn.algolia.com
+    # Web search (raw — Anthropic's WebSearch tool uses its own infra anyway)
+    www.google.com www.bing.com duckduckgo.com html.duckduckgo.com
+    # Product discovery
+    www.producthunt.com api.producthunt.com
+    # MCP-specific discovery
+    raw.githubusercontent.com gist.githubusercontent.com objects.githubusercontent.com
+    # Ad / funnel / landing inspiration
+    www.facebook.com graph.facebook.com www.instagram.com
+    landingfolio.com www.landingfolio.com saaslandingpage.com www.saaslandingpage.com
+    www.lapa.ninja lapa.ninja
+    # Design inspiration
+    dribbble.com www.dribbble.com cdn.dribbble.com
+    mobbin.com www.mobbin.com
+    pageflows.com www.pageflows.com
+    www.behance.net behance.net
+    # Marketing / CX content
+    www.intercom.com intercom.com blog.intercom.com
+    www.zendesk.com zendesk.com www.saastr.com
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 
