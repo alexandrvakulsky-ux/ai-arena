@@ -356,6 +356,30 @@ check "adspy:completeness-uses-sc-tracking" \
   "lib/sc-tracking" \
   "completeness-audit.js must require lib/sc-tracking so its SC calls count toward the daily total in /api/sc-cost. Otherwise audit spend is invisible (2026-05-26)"
 
+# 2026-05-26 — Weekly auto-add. The completeness audit surfaces untracked
+# pages; the auto-add script applies thresholds and grows the watchlist
+# without manual intervention. Two structural guards:
+#
+# (a) Auto-add must skip major media outlets — they're sponsored-content
+#     placements, not brand personas. Tracking them would flood the cache
+#     with their entire unrelated ad output.
+check "adspy:auto-add-skips-media-outlets" \
+  "/srv/ad-spy/scripts/auto-add-pages.js" \
+  "MEDIA_OUTLET_BLOCKLIST" \
+  "auto-add-pages.js must maintain a media-outlet blocklist (BuzzFeed, Reader's Digest, etc.). These are paid sponsored-content placements, not brand-operator pages — adding them to a brand's watchlist would track their entire publishing operation (2026-05-26)"
+
+# (b) Auto-add must apply spam-name filter (fiction/novel/dating pages
+#     that keyword-stuff a brand into otherwise-unrelated copy).
+check "adspy:auto-add-spam-filtered" \
+  "/srv/ad-spy/scripts/auto-add-pages.js" \
+  "BLOCKLIST_NAME_TERMS|looksSpam" \
+  "auto-add-pages.js must skip pages whose names match fiction/novel/drama/etc. blocklist patterns. These keyword-stuff brand names into ad copy; adding them pollutes the cache (2026-05-26)"
+
+check "adspy:auto-add-runs-weekly" \
+  "/srv/ad-spy/server.js" \
+  "maybeRunWeeklyAutoAdd\\(\\)" \
+  "server.js must call maybeRunWeeklyAutoAdd() from markUserActivity() so the watchlist actually grows without manual intervention. Otherwise the completeness audit surfaces findings that never get acted on (2026-05-26)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
