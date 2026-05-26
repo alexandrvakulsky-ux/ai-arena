@@ -381,6 +381,35 @@ check "adspy:auto-add-spam-filtered" \
 # Token monitor was a canary for nothing, so it got ripped. If a future
 # Meta-direct feature is added, re-add health monitoring invariants then.
 
+# 2026-05-26 — Coverage audit (Meta-API cross-check). Reintroduces an
+# OPTIONAL FB token dependency, audit-only — no live user-facing feature
+# touches the token. Three invariants pin the contract:
+#
+# (a) Coverage audit uses the canonical cache loader. Without this, the
+#     comp/{slug}.json structure can drift and the audit silently no-ops
+#     like verify-video-detection.js did against legacy _ads_cache.json.
+check "adspy:coverage-audit-uses-cache-walk" \
+  "/srv/ad-spy/scripts/coverage-audit.js" \
+  "require\\('\\.\\./lib/cache-walk'\\)" \
+  "coverage-audit.js must require lib/cache-walk for watchlist + per-comp cache reads. Direct path access drifts when cache layout changes — the audit then runs but silently scans zero ads (2026-05-26)"
+
+# (b) Graceful token-death path is the WHOLE point of this audit.
+#     If FB_ACCESS_TOKEN dies (as it did on 2026-05-13, silent for 13d),
+#     the script must write an audit_skipped report and exit 0 — not throw,
+#     not crash the weekly job, not silently noop. probeToken() before
+#     any data fetch is the contract.
+check "adspy:coverage-audit-probes-token-first" \
+  "/srv/ad-spy/scripts/coverage-audit.js" \
+  "probeToken|audit_skipped" \
+  "coverage-audit.js must probe Meta token health BEFORE making data calls and write an audit_skipped report on failure. Without this, a dead token would silently produce an empty or crashed audit — same failure mode that hid the May 13 token death (2026-05-26)"
+
+# (c) The audit wiring in server.js must gate on FB_ACCESS_TOKEN presence
+#     AND the kill switch. Skipping must be a console.log, not a crash.
+check "adspy:coverage-audit-optional-in-server" \
+  "/srv/ad-spy/server.js" \
+  "AD_SPY_DISABLE_COVERAGE_AUDIT|coverage-audit\\.js" \
+  "maybeRunWeeklyDiscovery must reference scripts/coverage-audit.js AND honor AD_SPY_DISABLE_COVERAGE_AUDIT. Coverage audit is the only feature that still touches Meta — it MUST stay optional so a dead token doesn't break weekly discovery (2026-05-26)"
+
 # ── AI Arena invariants ──────────────────────────────────────────────────────
 
 # (none yet — add as bugs recur)
