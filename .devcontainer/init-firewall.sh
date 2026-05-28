@@ -97,6 +97,8 @@ REQUIRED_DOMAINS=(
     # Marketing / CX content
     www.intercom.com intercom.com blog.intercom.com
     www.zendesk.com zendesk.com www.saastr.com
+    # Telegram Bot API — required for scout-bot to long-poll + send messages
+    api.telegram.org
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 

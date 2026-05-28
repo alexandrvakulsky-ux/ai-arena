@@ -23,7 +23,10 @@
  *  - Roughly $12-15/month at moderate use.
  */
 
-require('dotenv').config({ path: '/workspace/.env' });
+// override: true is critical — the Claude Code Remote runtime leaks empty
+// values for ANTHROPIC_API_KEY + TELEGRAM_BOT_TOKEN into the process env,
+// and dotenv refuses to overwrite existing values unless told to.
+require('dotenv').config({ path: '/workspace/.env', override: true });
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
