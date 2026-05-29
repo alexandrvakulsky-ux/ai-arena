@@ -12,3 +12,4 @@ agents/scout-bot/.bot-state.json
 agents/scout-bot/journal.md
 agents/scout-bot/pending-actions.jsonl
 agents/scout-bot/resolutions.jsonl
+agents/scout-bot/sources.json

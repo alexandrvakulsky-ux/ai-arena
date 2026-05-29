@@ -272,7 +272,24 @@ For ANYTHING requiring write/edit/run/push capability on the server, use propose
 - "Fix the typo in README" → propose_action with action_type=edit_file, plan including exact path + old_str + new_str
 - "Restart ad-spy" → propose_action with action_type=shell, plan including the exact pkill+nohup commands
 - "Push that change" → propose_action with action_type=git_branch_and_push
-The proposal sits in /workspace/agents/scout-bot/pending-actions.jsonl. When Alex next opens Claude Code on Hetzner, Claude surfaces it for his approval and executes.`;
+The proposal sits in /workspace/agents/scout-bot/pending-actions.jsonl. When Alex next opens Claude Code on Hetzner, Claude surfaces it for his approval and executes.
+
+═══ MONITORING SOURCE DATABASE ═══
+
+You maintain a growing database of accounts/repos/feeds to monitor for MCP and Futureproof intel. Tools: add_source, list_sources, score_source, record_source_find.
+
+Workflow:
+- AT THE START of every scout cadence (Mon MCP / Thu Futureproof), call list_sources(topic) to see what you're tracking. Bias your web_search toward known-quality sources (quality >= 3) first.
+- WHEN YOU FIND a useful item attributable to a source, call record_source_find(id, summary, url) — this builds the productivity log per source.
+- WHEN ALEX REACTS to a find ("loved this one", "skip @X they're noisy"), call score_source(id, delta, reason). +1 to +3 for hits, -1 to -3 for misses. Quality < -3 means stop checking.
+- WHEN YOU DISCOVER a new high-signal account (mentioned by a known-quality source, or someone Alex talks about positively), call add_source. Don't ask Alex first — adding is cheap and reversible. Just add it.
+- WHEN ALEX TELLS YOU about an account he follows ("@X is great" or "you should follow @Y"), call add_source AND tell him you did it.
+
+The database is the system's growing intelligence — references → new sources → quality scoring → verified-tier (q≥5) sources scouted first. Treat it as a network you're cultivating, not a static list.
+
+Output style for scout reports:
+- Each find should cite the source ID and handle, e.g. "[src_seed_swyx | @swyx] retweeted a thread about new MCP server X..."
+- At the end of the scout, briefly note: "Source updates this cycle: added @NewSource (mentioned by @swyx), bumped @ProductiveAccount to q=4 after 3 hits." That keeps the database growth visible.`;
 }
 
 function processMemoryUpdates(replyText) {
@@ -548,9 +565,9 @@ const CADENCES = [
 const PROMPTS = {
   'daily-checkin': `Generate a SHORT daily check-in question to Alex. Reference yesterday's journal entries if relevant. ONE focused question, max 2 sentences before it. Examples of good openers:\n- "Yesterday you said X — did it ship?"\n- "Two days back you flagged the funnel issue. Where's that now?"\n- "What's the top thing today?"\n\nMake it specific to context if you have it, generic if not. Output ONLY the message text — no preamble, no markdown, ready to send to Telegram as-is.`,
 
-  'mcp-scout': `It's Monday. Generate the opening message for the MCP scout cadence. Briefly acknowledge it's Monday and you're about to scout MCP releases for the past week. Ask Alex ONE planning-style question first (e.g., "what category are you hungry for?" or "any specific problem you wish an MCP solved?"). After he answers (in a later message), you'll actually do the scouting with web_search. For THIS message just write the opener. Output ONLY the message text, ready to send.`,
+  'mcp-scout': `It's Monday. Generate the opening message for the MCP scout cadence. First, call list_sources(topic='mcp') to see what you're already monitoring — surface 1-2 high-quality sources you'll check ("checking @swyx, modelcontextprotocol/servers, r/ClaudeAI today"). Then ask Alex ONE planning question (what category he's hungry for, or any new account he wants you to add). For THIS message just write the opener — no actual web_search yet. Output ONLY the message text.`,
 
-  'futureproof-scout': `It's Thursday. Generate the opening message for the Futureproof intel scout cadence. Ask Alex 2-3 quick prep questions (max 3, one-liners): blocker, competitor to look at, what tested last week. Output ONLY the opener message, ready to send.`,
+  'futureproof-scout': `It's Thursday. Generate the opener for the Futureproof intel cadence. First call list_sources(topic='futureproof') and list_sources(topic='marketing') to acknowledge what you're tracking. Then ask Alex 2-3 prep one-liners: biggest blocker, competitor to look at, what tested last week. Output ONLY the opener, ready to send.`,
 
   'sunday-wrap': `It's Sunday 5pm. Generate a soft weekly wrap-up message. Reference the journal entries from this past week if any. Ask: "what shipped this week?", "what's on your mind for next?", and one specific reference back to something he mentioned earlier in the week if possible. Output ONLY the message text, conversational, max 4 short sentences.`,
 };
