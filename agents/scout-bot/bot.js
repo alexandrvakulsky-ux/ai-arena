@@ -124,11 +124,45 @@ async function sendMessage(chat_id, text) {
 // ── History / Memory / Journal ───────────────────────────────────────────
 function chatHistoryFile(chat_id) { return path.join(CHATS_DIR, `${chat_id}.json`); }
 function loadHistory(chat_id) {
-  try { return JSON.parse(fs.readFileSync(chatHistoryFile(chat_id), 'utf8')); }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(fs.readFileSync(chatHistoryFile(chat_id), 'utf8'));
+    // Filter out turns with empty/missing content — Anthropic API rejects
+    // those with "user messages must have non-empty content". Defensive:
+    // covers historic poisoning by forwarded-media messages that slipped
+    // through before the extractMessageContent fix.
+    return raw.filter(turn =>
+      turn && typeof turn.content === 'string' && turn.content.trim().length > 0
+    );
+  } catch { return []; }
 }
 function saveHistory(chat_id, history) {
   fs.writeFileSync(chatHistoryFile(chat_id), JSON.stringify(history.slice(-HISTORY_KEEP), null, 2));
+}
+
+// Extract a usable text payload from a Telegram message. Handles:
+//  - plain text (.text)
+//  - captions on photos/videos/documents (.caption)
+//  - forwards (prepends "[Forwarded from X]" header)
+//  - empty messages (stickers, voice, location, polls, etc.) → returns null
+function extractMessageContent(msg) {
+  const parts = [];
+  if (msg.forward_from_chat) {
+    const src = msg.forward_from_chat.title || msg.forward_from_chat.username || 'a chat';
+    parts.push(`[Forwarded from ${src}]`);
+  } else if (msg.forward_from) {
+    const src = msg.forward_from.first_name || msg.forward_from.username || 'someone';
+    parts.push(`[Forwarded from ${src}]`);
+  } else if (msg.forward_sender_name) {
+    parts.push(`[Forwarded from ${msg.forward_sender_name}]`);
+  }
+  if (msg.text && msg.text.trim()) parts.push(msg.text.trim());
+  if (msg.caption && msg.caption.trim()) parts.push(msg.caption.trim());
+
+  // If we only have the [Forwarded from X] header and nothing else, there's
+  // no real content — return null so caller can reply "no text seen".
+  const hasRealText = parts.some(p => !p.startsWith('[Forwarded'));
+  if (!hasRealText) return null;
+  return parts.join('\n');
 }
 
 function loadMemory() {
@@ -365,7 +399,11 @@ async function handleSlashCommand(chat_id, text) {
 // ── Incoming message handler ────────────────────────────────────────────
 async function handleMessage(msg) {
   const chat_id = msg.chat.id;
-  const text = msg.text || '';
+  // Extract usable content (text, caption, forwarded metadata). Returns
+  // null for empty/media-only messages (stickers, voice, etc).
+  const content = extractMessageContent(msg);
+  const text = content || ''; // for command parsing / passphrase check
+  const isEmpty = content === null;
 
   const authed = authorizedChatId();
   if (authed === null) {
@@ -377,6 +415,12 @@ async function handleMessage(msg) {
     return;
   }
   if (chat_id !== authed) return;
+
+  // Empty / media-only messages: be polite, don't pass to API.
+  if (isEmpty) {
+    await sendMessage(chat_id, `Got a message with no text I can read (sticker, voice, photo without caption, etc.). What did you want to discuss about it? I can only process text + captions right now.`);
+    return;
+  }
 
   // Slash + natural-language snooze
   if (text.startsWith('/')) {
@@ -397,10 +441,11 @@ async function handleMessage(msg) {
   }
 
   // Capture short user content to journal so future questions can reference it.
-  if (text.length > 5 && text.length < 500) appendJournal(`Alex: ${text}`);
+  // Use `content` (extracted, includes forward headers) — never empty here.
+  if (content.length > 5 && content.length < 2000) appendJournal(`Alex: ${content.slice(0, 500)}`);
 
   await tg('sendChatAction', { chat_id, action: 'typing' });
-  const reply = await generateReply(chat_id, text);
+  const reply = await generateReply(chat_id, content);
   if (reply && reply.trim()) {
     appendJournal(`bot: ${reply.slice(0, 200)}${reply.length > 200 ? '…' : ''}`);
     await sendMessage(chat_id, reply);
