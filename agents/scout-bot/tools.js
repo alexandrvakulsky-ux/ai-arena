@@ -99,6 +99,33 @@ const TOOL_SCHEMAS = [
     description: 'Return current branch + most recent commit summary from /workspace .git files. Read-only.',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: 'propose_action',
+    description:
+      'Queue an action that requires write/run/push capability on the Hetzner server for Alex to approve in Claude Code. ' +
+      'Use this when Alex asks for something concrete that you cannot do with the read-only tools — edit code, run a shell command, restart a service, push commits, etc. ' +
+      'After calling this tool, tell Alex in your reply that you queued the proposal and it will surface next time he interacts with Claude Code on the server.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'One-line description (what + why combined). E.g. "Fix typo in README line 42 (recieve → receive)".' },
+        action_type: {
+          type: 'string',
+          enum: ['edit_file', 'write_file', 'shell', 'git_branch_and_push', 'restart_service', 'other'],
+          description: 'Category of action — helps Claude Code decide which tools to use.',
+        },
+        plan: {
+          type: 'string',
+          description: 'Concrete, self-contained steps Claude Code should execute. Include exact file paths, exact strings to find/replace, exact commands to run. Claude Code will execute this without coming back to you for details — be precise.',
+        },
+        why: {
+          type: 'string',
+          description: 'One paragraph of context: why this needs doing, what Alex asked for, what risks/trade-offs Claude should know about.',
+        },
+      },
+      required: ['summary', 'plan'],
+    },
+  },
 ];
 
 // ── Safety: read denylist ───────────────────────────────────────────────
@@ -203,6 +230,28 @@ function execTailLog({ name, lines }) {
   }
 }
 
+const PROPOSALS_FILE = '/workspace/agents/scout-bot/pending-actions.jsonl';
+function execProposeAction({ summary, action_type, plan, why }) {
+  if (!summary || typeof summary !== 'string') return 'ERROR: summary required';
+  if (!plan || typeof plan !== 'string') return 'ERROR: plan required (concrete steps Claude Code can execute)';
+  const id = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+  const proposal = {
+    id,
+    ts: new Date().toISOString(),
+    summary: summary.slice(0, 200),
+    action_type: action_type || 'other',
+    plan: plan.slice(0, 6000),
+    why: (why || '').slice(0, 1000),
+  };
+  try {
+    fs.mkdirSync(path.dirname(PROPOSALS_FILE), { recursive: true });
+    fs.appendFileSync(PROPOSALS_FILE, JSON.stringify(proposal) + '\n');
+    return `✓ Queued proposal ${id}\n\nSummary: ${proposal.summary}\n\nAlex will see this next time he opens Claude Code on the Hetzner box. In your reply to Alex, mention you queued it and what it'll do.`;
+  } catch (e) {
+    return `ERROR: ${e.message}`;
+  }
+}
+
 function execGitHeadInfo() {
   try {
     const headPath = '/workspace/.git/HEAD';
@@ -243,6 +292,7 @@ async function executeTool(name, input) {
       case 'list_directory': return execListDirectory(input || {});
       case 'tail_log': return execTailLog(input || {});
       case 'git_head_info': return execGitHeadInfo();
+      case 'propose_action': return execProposeAction(input || {});
       default: return `ERROR: unknown tool ${name}`;
     }
   } catch (e) {

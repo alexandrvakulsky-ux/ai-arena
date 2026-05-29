@@ -10,3 +10,5 @@ agents/scout-bot/chats/
 agents/scout-bot/.authorized_chat.txt
 agents/scout-bot/.bot-state.json
 agents/scout-bot/journal.md
+agents/scout-bot/pending-actions.jsonl
+agents/scout-bot/resolutions.jsonl
