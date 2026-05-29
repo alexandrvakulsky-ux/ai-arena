@@ -99,6 +99,8 @@ REQUIRED_DOMAINS=(
     www.zendesk.com zendesk.com www.saastr.com
     # Telegram Bot API — required for scout-bot to long-poll + send messages
     api.telegram.org
+    # AIDesigner MCP server — frontend design generator (project-scope MCP)
+    api.aidesigner.ai
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 
