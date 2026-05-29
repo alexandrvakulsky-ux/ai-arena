@@ -31,10 +31,14 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 const { execSync } = require('child_process');
+const FormData = require('form-data');
+let YoutubeTranscript;
+try { YoutubeTranscript = require('youtube-transcript').YoutubeTranscript; } catch {}
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PASSPHRASE = process.env.TELEGRAM_PASSPHRASE || 'futureproof-scout';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const OPENAI_KEY = process.env.OPENAI_API_KEY;
 
 if (!TOKEN) { console.error('[scout-bot] TELEGRAM_BOT_TOKEN missing — exiting'); process.exit(0); }
 if (!ANTHROPIC_KEY) { console.error('[scout-bot] ANTHROPIC_API_KEY missing — exiting'); process.exit(1); }
@@ -144,6 +148,83 @@ function saveHistory(chat_id, history) {
 //  - captions on photos/videos/documents (.caption)
 //  - forwards (prepends "[Forwarded from X]" header)
 //  - empty messages (stickers, voice, location, polls, etc.) → returns null
+// ── Whisper voice transcription ──────────────────────────────────────────
+// Telegram voice messages arrive as .ogg/opus files. We fetch the file
+// via Telegram's getFile API and POST it to OpenAI's Whisper endpoint.
+// Returns the transcribed text or null on any failure (caller falls back
+// to "I can't read voice yet" reply).
+async function transcribeVoice(fileId) {
+  if (!OPENAI_KEY) {
+    console.error('[voice] OPENAI_API_KEY missing — cannot transcribe');
+    return null;
+  }
+  try {
+    const fileRes = await tg('getFile', { file_id: fileId });
+    if (!fileRes.ok || !fileRes.result?.file_path) {
+      console.error('[voice] getFile failed:', JSON.stringify(fileRes).slice(0, 200));
+      return null;
+    }
+    const audioUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileRes.result.file_path}`;
+    const audioRes = await fetch(audioUrl, { timeout: 30000 });
+    if (!audioRes.ok) {
+      console.error('[voice] file download failed:', audioRes.status);
+      return null;
+    }
+    const audioBuf = await audioRes.buffer();
+
+    const form = new FormData();
+    form.append('file', audioBuf, { filename: 'voice.ogg', contentType: 'audio/ogg' });
+    form.append('model', 'whisper-1');
+
+    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, ...form.getHeaders() },
+      body: form,
+      timeout: 60000,
+    });
+    if (!whisperRes.ok) {
+      console.error('[voice] Whisper error:', whisperRes.status, (await whisperRes.text()).slice(0, 200));
+      return null;
+    }
+    const data = await whisperRes.json();
+    console.log(`[voice] transcribed ${audioBuf.length}b → ${(data.text || '').length} chars`);
+    return data.text || null;
+  } catch (err) {
+    console.error('[voice] transcribeVoice error:', err.message);
+    return null;
+  }
+}
+
+// ── YouTube transcript fetch ─────────────────────────────────────────────
+// Detects YouTube URLs in user messages and pulls captions via the
+// youtube-transcript npm package (pure Node, no yt-dlp/system deps).
+// Failures degrade gracefully — the URL just stays as a URL in the
+// message; Claude can still respond to it.
+const YT_URL_REGEX = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/g;
+function extractYouTubeIds(text) {
+  if (!text) return [];
+  const ids = new Set();
+  let m;
+  YT_URL_REGEX.lastIndex = 0;
+  while ((m = YT_URL_REGEX.exec(text)) !== null) ids.add(m[1]);
+  return [...ids];
+}
+async function fetchYouTubeTranscript(videoId) {
+  if (!YoutubeTranscript) {
+    console.error('[yt] youtube-transcript package not installed');
+    return null;
+  }
+  try {
+    const parts = await YoutubeTranscript.fetchTranscript(videoId);
+    const text = parts.map(p => p.text).join(' ').replace(/\s+/g, ' ').trim();
+    console.log(`[yt] ${videoId} → ${text.length} chars`);
+    return text;
+  } catch (err) {
+    console.error(`[yt] ${videoId} fetch failed:`, err.message);
+    return null;
+  }
+}
+
 function extractMessageContent(msg) {
   const parts = [];
   if (msg.forward_from_chat) {
@@ -471,9 +552,30 @@ async function handleSlashCommand(chat_id, text) {
 // ── Incoming message handler ────────────────────────────────────────────
 async function handleMessage(msg) {
   const chat_id = msg.chat.id;
+
+  // ── Voice transcription via Whisper ───────────────────────────────────
+  // Telegram voice / audio messages have no msg.text. We transcribe them
+  // to text BEFORE extractMessageContent runs, then synthesize msg.text
+  // so the rest of the handler treats them as normal text input.
+  if ((msg.voice || msg.audio) && OPENAI_KEY) {
+    const fileId = (msg.voice || msg.audio).file_id;
+    await tg('sendChatAction', { chat_id, action: 'typing' });
+    await sendMessage(chat_id, '🎤 transcribing...');
+    const transcript = await transcribeVoice(fileId);
+    if (transcript && transcript.trim()) {
+      msg.text = `[voice] ${transcript.trim()}`;
+    } else {
+      await sendMessage(chat_id, `Couldn't transcribe that voice message. Try sending text, or check that the OPENAI_API_KEY is set correctly.`);
+      return;
+    }
+  } else if ((msg.voice || msg.audio) && !OPENAI_KEY) {
+    await sendMessage(chat_id, `Got a voice message but OPENAI_API_KEY isn't set — can't transcribe. Set it in /workspace/.env and restart bot.`);
+    return;
+  }
+
   // Extract usable content (text, caption, forwarded metadata). Returns
-  // null for empty/media-only messages (stickers, voice, etc).
-  const content = extractMessageContent(msg);
+  // null for empty/media-only messages (stickers, photo without caption, etc).
+  let content = extractMessageContent(msg);
   const text = content || ''; // for command parsing / passphrase check
   const isEmpty = content === null;
 
@@ -488,10 +590,29 @@ async function handleMessage(msg) {
   }
   if (chat_id !== authed) return;
 
-  // Empty / media-only messages: be polite, don't pass to API.
+  // Empty / media-only messages (sticker, photo no caption, etc): be polite.
   if (isEmpty) {
-    await sendMessage(chat_id, `Got a message with no text I can read (sticker, voice, photo without caption, etc.). What did you want to discuss about it? I can only process text + captions right now.`);
+    await sendMessage(chat_id, `Got a message with no text I can read (sticker, photo without caption, etc.). What did you want to discuss about it? I can process text, captions, voice notes, and YouTube links.`);
     return;
+  }
+
+  // ── YouTube transcript inlining ───────────────────────────────────────
+  // Detects YouTube URLs in the message, fetches captions, inlines into
+  // the content so Claude can summarize / discuss the video directly.
+  // Caps each transcript at 6000 chars to keep token use bounded.
+  const ytIds = extractYouTubeIds(content);
+  if (ytIds.length > 0 && YoutubeTranscript) {
+    await tg('sendChatAction', { chat_id, action: 'typing' });
+    await sendMessage(chat_id, `📺 fetching transcript${ytIds.length > 1 ? `s for ${ytIds.length} videos` : ''}...`);
+    for (const id of ytIds) {
+      const transcript = await fetchYouTubeTranscript(id);
+      if (transcript) {
+        const trimmed = transcript.length > 6000 ? transcript.slice(0, 6000) + ` [... ${transcript.length - 6000} more chars truncated]` : transcript;
+        content += `\n\n[YouTube transcript for video ${id}]\n${trimmed}`;
+      } else {
+        content += `\n\n[YouTube ${id}: transcript unavailable — captions may be disabled]`;
+      }
+    }
   }
 
   // Slash + natural-language snooze
