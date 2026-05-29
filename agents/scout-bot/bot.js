@@ -259,7 +259,19 @@ ${journal}
 Live system snapshot:
 ${snapshot}
 
-You have web_search — use it when you need current info, but don't over-search. If you already know the answer, just say it.`;
+You have web_search — use it when you need current info, but don't over-search. If you already know the answer, just say it.
+
+You also have READ-ONLY server tools — use them when Alex asks about server state or live data:
+- query_adspy(path) — GET an ad-spy endpoint. E.g. "/health" for ad/competitor counts, "/api/sc-cost" for SC credit usage, "/api/access-stats" for visitor activity.
+- query_aiarena(path) — GET an ai-arena endpoint. "/health" works.
+- read_file(path) — read a file under /workspace. .env and credential files are denied. Use for code, configs, journal.md, memory.md, cached data, etc.
+- list_directory(path) — list a /workspace or /tmp directory.
+- git_status() — current git status of /workspace.
+- tail_log(name, lines) — tail server.log, scout-bot.log, auto-deploy.log, or supervisor.log.
+
+Use these tools when answering "what's running", "show me X", "how much credit left", "what's in the latest brief", "what did I journal yesterday", etc. Don't ask Alex to do it — just check and report.
+
+You DO NOT have write/edit/push tools right now. If Alex asks you to make code changes, draft a self-contained Claude Code prompt for him to paste into Claude Code Desktop (in a fenced \`\`\`claude-code-prompt block). Don't pretend you can edit files — say honestly: "I can't edit files yet but here's a prompt to paste into Claude Code Desktop."`;
 }
 
 function processMemoryUpdates(replyText) {
@@ -280,46 +292,88 @@ function processMemoryUpdates(replyText) {
   return remaining.join('\n').trim();
 }
 
+// Custom tools the bot can call (read-only — query ad-spy, query ai-arena,
+// read files, list dirs, git status, tail logs). See tools.js.
+const { TOOL_SCHEMAS: BOT_TOOLS, executeTool } = require('./tools');
+const MAX_TOOL_ITERATIONS = 10;
+
 async function generateReply(chat_id, userMessage, systemOverride = null) {
   let history = loadHistory(chat_id);
   history.push({ role: 'user', content: userMessage, ts: Date.now() });
-  const messages = history.slice(-MAX_HISTORY_TURNS).map(({ role, content }) => ({ role, content }));
+  // Build messages from stored history (plain text turns only).
+  let messages = history.slice(-MAX_HISTORY_TURNS).map(({ role, content }) => ({ role, content }));
 
-  let data;
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'anthropic-beta': 'web-search-2025-03-05',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2000,
-        system: systemOverride || buildSystemPrompt(),
-        messages,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
-      }),
-      timeout: 90000,
-    });
-    data = await r.json();
-  } catch (err) {
-    console.error('[anthropic] fetch error:', err.message);
-    return 'hit a network issue talking to Claude — try again?';
+  // Agentic loop: call API, execute any tool_use blocks, feed results
+  // back, repeat until Claude stops calling tools (final answer).
+  let finalText = '';
+  for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+    let data;
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-beta': 'web-search-2025-03-05',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 3000,
+          system: systemOverride || buildSystemPrompt(),
+          messages,
+          tools: [
+            { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+            ...BOT_TOOLS,
+          ],
+        }),
+        timeout: 120000,
+      });
+      data = await r.json();
+    } catch (err) {
+      console.error('[anthropic] fetch error:', err.message);
+      return 'hit a network issue talking to Claude — try again?';
+    }
+    if (data.error) {
+      console.error('[anthropic] error:', JSON.stringify(data.error).slice(0, 200));
+      return `Claude API error: ${data.error.message || 'unknown'}`;
+    }
+
+    const content = data.content || [];
+    // Filter to OUR tool uses (not web_search — that's server-side).
+    const ourTools = new Set(BOT_TOOLS.map(t => t.name));
+    const toolUses = content.filter(c => c.type === 'tool_use' && ourTools.has(c.name));
+    const textBlocks = content.filter(c => c.type === 'text');
+
+    if (toolUses.length === 0) {
+      // No more tool calls — this is the final response.
+      finalText = textBlocks.map(c => c.text).join('\n\n');
+      break;
+    }
+
+    // Append assistant's tool_use turn (full content array — required).
+    messages.push({ role: 'assistant', content });
+
+    // Execute each tool, build tool_result blocks.
+    const toolResults = [];
+    for (const t of toolUses) {
+      console.log(`[tool] ${t.name}(${JSON.stringify(t.input).slice(0, 100)})`);
+      const result = await executeTool(t.name, t.input);
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: t.id,
+        content: typeof result === 'string' ? result : JSON.stringify(result),
+      });
+    }
+    messages.push({ role: 'user', content: toolResults });
   }
-  if (data.error) {
-    console.error('[anthropic] error:', JSON.stringify(data.error).slice(0, 200));
-    return `Claude API error: ${data.error.message || 'unknown'}`;
-  }
 
-  const rawReply = (data.content || [])
-    .filter(c => c.type === 'text')
-    .map(c => c.text)
-    .join('\n\n');
-  const cleanReply = processMemoryUpdates(rawReply);
+  if (!finalText) finalText = '(no response — tool loop exhausted)';
+  const cleanReply = processMemoryUpdates(finalText);
 
+  // Persist ONLY the simple text turns to disk (not the tool calls).
+  // This keeps history serializable and avoids re-feeding stale tool
+  // results on the next turn.
   history.push({ role: 'assistant', content: cleanReply, ts: Date.now() });
   saveHistory(chat_id, history);
   return cleanReply;

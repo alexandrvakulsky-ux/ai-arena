@@ -43,3 +43,41 @@ replies — the handler parses those out and appends them here.
 - Re-flagging things you already showed him
 
 ## Updates (auto-appended by the agent over time)
+
+
+## Updates 2026-05-29
+- Alex is dealing with Facebook personal account blocks, going through appeals process (2026-05-29).
+- Alex is assembling a team to integrate AI agents into Futureproof (2026-05-29).
+
+## Updates 2026-05-29
+- Alex wants AI agents for Futureproof in three areas: support, audience feedback gathering, and competitor/funnel research. Some will be internal, some user-facing — flexible depending on context (2026-05-29).
+
+## Updates 2026-05-29
+- Alex has Zendesk for support. Considering Gemini voice API for voice-based agent features in Futureproof (2026-05-29).
+- Alex wants AI agents for Futureproof in three areas: support, audience feedback gathering, and competitor/funnel research. Some will be internal, some user-facing — flexible depending on context (2026-05-29).
+
+## Updates 2026-05-29
+- Alex has Zendesk for support. Considering Gemini voice API for voice-based agent features in Futureproof (2026-05-29).
+- Alex wants AI agents for Futureproof in three areas: support, audience feedback gathering, and competitor/funnel research. Some will be internal, some user-facing — flexible depending on context (2026-05-29).
+
+## Updates 2026-05-29
+- Alex's personal Facebook profile is restricted due to ad account activity. He's going through the appeals process (2026-05-29).
+- Alex has a full separate project stack for Futureproof, not using the same Hetzner/Node setup as ad-spy and ai-arena (2026-05-29).
+
+## Updates 2026-05-29
+- Alex is dealing with Facebook personal account blocks, going through appeals process (2026-05-29).
+- Alex is assembling a team to integrate AI agents into Futureproof (2026-05-29).
+- Alex wants AI agents for Futureproof in three areas: support, audience feedback gathering, and competitor/funnel research. Some will be internal, some user-facing — flexible depending on context (2026-05-29).
+- Alex has Zendesk for support. Considering Gemini voice API for voice-based agent features in Futureproof (2026-05-29).
+- Alex has a full separate project stack for Futureproof, not using the same Hetzner/Node setup as ad-spy and ai-arena (2026-05-29).
+- Alex is waiting to chat with his CTO before making team/architecture decisions for the AI agent work (2026-05-29).
+
+## Updates 2026-05-29
+- Alex is in discussions with Meta about MCP connectors to Meta Ads, and is aware of Manus AI integration. He shared this info in what appears to be a Ukrainian-language group chat (2026-05-29).
+- Alex may have direct Meta contacts for ad platform discussions (2026-05-29).
+
+## Updates 2026-05-29
+- Alex is in a community/group discussing MCP connectors to Meta Ads and Manus AI integration with Meta Ads Manager. He's testing and sharing results (2026-05-29).
+
+## Updates 2026-05-29
+- Alex wants regular monitoring of Manus AI (Meta Ads Manager integration) for useful updates. Key triggers to flag: reliability improvements, campaign execution features, EU availability, new MCP connectors, anything relevant to ad-spy or Futureproof (2026-05-29).
