@@ -125,8 +125,12 @@ async function main() {
     return out({ ok: true, canvas_id: id, file: outPath, bytes });
   }
   if (cmd === 'gen') {
-    const outPath = pos[0]; if (!outPath || !flags['prompt-file']) fail('usage: gen <out.html> --prompt-file=P [--repo-file=R] [--brand=ID] [--viewport=] [--mode= --url=]');
-    const args = { prompt: readFileArg(flags['prompt-file']), repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
+    const outPath = pos[0]; if (!outPath || !flags['prompt-file']) fail('usage: gen <out.html> --prompt-file=P [--title="Name"] [--repo-file=R] [--brand=ID] [--viewport=] [--mode= --url=]');
+    let prompt = readFileArg(flags['prompt-file']);
+    // Naming logic: the editor canvas name is derived from the design <title>.
+    // Always pass a distinct --title so layouts are named clearly (not "Untitled"/dupes).
+    if (flags.title) prompt = `Name this design exactly "${flags.title}": use it verbatim as the HTML <title> element and the document's main heading, so the editor canvas is named "${flags.title}".\n\n` + prompt;
+    const args = { prompt, repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
     if (flags.brand) args.brand_kit_id = flags.brand;
     if (flags.viewport) args.viewport = flags.viewport;
     if (flags.mode) { args.mode = flags.mode; if (flags.url) args.url = flags.url; }
@@ -135,8 +139,12 @@ async function main() {
     return out({ ok: true, run_id: meta.run_id, canvas_id: meta.canvas_delivery && meta.canvas_delivery.canvas_id, file: outPath, bytes });
   }
   if (cmd === 'refine') {
-    const outPath = pos[0]; if (!outPath || !flags.run || !flags['feedback-file']) fail('usage: refine <out.html> --run=RUN --feedback-file=F [--repo-file=R] [--brand=ID] [--target=CANVAS] [--viewport=]');
-    const args = { run_id_or_html: flags.run, feedback: readFileArg(flags['feedback-file']), repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
+    const outPath = pos[0]; if (!outPath || !flags.run || !flags['feedback-file']) fail('usage: refine <out.html> --run=RUN --feedback-file=F [--target=CANVAS_ID(overwrite in place — USE for iterations)] [--title="Name"(new-canvas only)] [--repo-file=R] [--brand=ID] [--viewport=]');
+    let feedback = readFileArg(flags['feedback-file']);
+    // Iterations should OVERWRITE (--target) so canvases don't pile up. A new
+    // canvas (no --target) is only for a genuinely new direction → give it a --title.
+    if (flags.title && !flags.target) feedback = `Name this design exactly "${flags.title}" (use as the <title> and main heading).\n\n` + feedback;
+    const args = { run_id_or_html: flags.run, feedback, repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
     if (flags.brand) args.brand_kit_id = flags.brand;
     if (flags.target) args.target_canvas_id = flags.target;
     if (flags.viewport) args.viewport = flags.viewport;

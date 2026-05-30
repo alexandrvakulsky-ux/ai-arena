@@ -54,7 +54,11 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 - Check creds: `node scripts/aidesigner.js credits`. Brand kit **"Ad Spy"** = `3ba50f7f-aa3a-4b85-9bea-de0986dd60d7` (DM Sans, navy, spiral). Editor session `5ee32805-c5f3-4c9f-a876-535c49ec9dfb`. (MCP `whoami`/editor-session/brand-kit tools are fine — they're low-token; only generate/refine/get_canvas must go through the CLI.)
 - **Generate:** write the prompt to a file, then
   `node scripts/aidesigner.js gen /workspace/.claude/designs/current/design.html --prompt-file=/tmp/p.txt [--repo-file=/tmp/r.txt] [--brand=3ba50f7f-…] [--viewport=desktop] [--mode=clone|enhance|inspire --url=REF]` → returns `{run_id, canvas_id, file}` only; HTML is in the file + the editor canvas.
-- **Refine:** `node scripts/aidesigner.js refine <out.html> --run=<run_id> --feedback-file=/tmp/fb.txt [--brand=…] [--target=<canvas_id>]`. Omit `--target` for a NEW canvas (before/after in the editor); pass it to overwrite in place.
+- **Refine:** `node scripts/aidesigner.js refine <out.html> --run=<run_id> --feedback-file=/tmp/fb.txt [--target=<canvas_id>] [--brand=…]`.
+- **Canvas hygiene (so layouts don't pile up / overlap with dupe names):** AIDesigner's API has NO rename/move/delete for design canvases — name + position are server-set. So:
+  - **Always `--title="Ad Spy — <Direction> v<N>"`** on `gen` and on any new-canvas refine → a clear, unique canvas name (the name is derived from the design `<title>`).
+  - **Iterations of the SAME direction → `refine --target=<canvas_id>`** (overwrite in place). A NEW canvas is ONLY for a genuinely different direction.
+  - When a board gets cluttered (can't delete canvases), **`create_editor_session` for a fresh clean board** and re-link.
 - Per Stage 0: attach references (`--mode`+`--url`, brand kit, or `image_urls`) — don't prompt from imagination.
 
 ### 2. Publish to staging
