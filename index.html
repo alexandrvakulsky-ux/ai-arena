@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ad Spy | Competitive Ad Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --accent-primary: #0033FF;
+            --brand-dark-navy: #0A192F;
+            --brand-light-gray: #D3D3D3;
+            --brand-medium-gray: #A9A9A9;
+            --brand-white: #FFFFFF;
+            --bg-canvas: #040914;
+            --bg-panel: #0A192F;
+            --bg-panel-hover: #0E2240;
+            --border-subtle: rgba(211, 211, 211, 0.1);
+            --border-highlight: rgba(0, 51, 255, 0.4);
+        }
+        body { font-family: 'DM Sans', sans-serif; background-color: var(--bg-canvas); color: var(--brand-white); -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(10, 25, 47, 0.5); }
+        ::-webkit-scrollbar-thumb { background: var(--brand-medium-gray); border-radius: 0px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+        .data-panel { background: var(--bg-panel); border: 1px solid var(--border-subtle); transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
+        .data-panel:hover { border-color: var(--border-highlight); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(0, 51, 255, 0.1); transform: translateY(-2px); }
+        @keyframes revealData { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-cascade { animation: revealData 0.4s cubic-bezier(0.25, 1, 0.5, 1) both; animation-delay: calc(var(--idx) * 60ms); }
+        .tracker-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 2px; border: 1px solid transparent; }
+        .badge-winner { background: rgba(0, 51, 255, 0.1); color: #4D7BFF; border-color: rgba(0, 51, 255, 0.3); }
+        .badge-scaling { background: transparent; color: var(--brand-white); border-color: var(--border-subtle); }
+        .badge-velocity { background: var(--accent-primary); color: var(--brand-white); box-shadow: 0 0 10px rgba(0,51,255,0.4); }
+        .badge-neutral { background: rgba(211, 211, 211, 0.05); color: var(--brand-medium-gray); border-color: rgba(211, 211, 211, 0.1); }
+        .lib-content { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .lib-group.is-open .lib-content { grid-template-rows: 1fr; }
+        .lib-inner { overflow: hidden; }
+        .chevron { transition: transform 0.2s ease; }
+        .lib-group.is-open .chevron { transform: rotate(90deg); }
+        .img-tint { position: relative; }
+        .img-tint::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, var(--bg-panel) 0%, rgba(10,25,47,0.3) 100%); mix-blend-mode: multiply; pointer-events: none; }
+        h1, h2, h3, h4, h5, h6, .bold-text { font-weight: 700; }
+        .btn-primary { background-color: var(--accent-primary); color: var(--brand-white); font-weight: 700; transition: all 0.2s; }
+        .btn-primary:hover { background-color: #0029CC; box-shadow: 0 4px 15px rgba(0, 51, 255, 0.3); }
+        .tab-active { color: var(--brand-white); border-bottom: 2px solid var(--accent-primary); }
+        .tab-inactive { color: var(--brand-medium-gray); border-bottom: 2px solid transparent; }
+        .tab-inactive:hover { color: var(--brand-light-gray); }
+    </style>
+</head>
+<body class="h-[100dvh] flex overflow-hidden w-full mx-auto max-w-[1920px]">
+
+    <aside class="w-[260px] flex-shrink-0 bg-[#040914] border-r border-[#D3D3D3]/10 flex-col hidden md:flex z-20 relative">
+        <div class="h-16 flex items-center px-6 border-b border-[#D3D3D3]/10 shrink-0">
+            <div class="flex items-center gap-3 w-full">
+                <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-[#0033FF]">
+                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M 85 50 A 35 35 0 0 1 15 50" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-dasharray="10 15"/>
+                    <path d="M 28 50 A 22 22 0 1 1 72 50 A 22 22 0 1 1 28 50" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-dasharray="50 15"/>
+                    <circle cx="50" cy="50" r="8" fill="currentColor"/>
+                    <line x1="0" y1="50" x2="6" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                    <line x1="94" y1="50" x2="100" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                </svg>
+                <div class="flex flex-col">
+                    <span class="text-xl font-bold tracking-tight text-white leading-none">Ad Spy</span>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-8">
+            <div class="space-y-1">
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-[#A9A9A9] hover:text-white hover:bg-[#0A192F] rounded transition-colors group">
+                    <i class="ph ph-squares-four text-lg group-hover:text-[#0033FF]"></i>
+                    <span class="text-sm">Overview</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-white bg-[#0A192F] rounded transition-colors group border border-[#D3D3D3]/5">
+                    <i class="ph ph-funnel text-[#0033FF] text-lg"></i>
+                    <span class="text-sm font-bold">Ad Library</span>
+                </button>
+                <button class="w-full flex items-center gap-3 px-3 py-2 text-[#A9A9A9] hover:text-white hover:bg-[#0A192F] rounded transition-colors group">
+                    <i class="ph ph-chart-bar text-lg group-hover:text-[#0033FF]"></i>
+                    <span class="text-sm">Market Trends</span>
+                </button>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between px-3 mb-3 border-b border-[#D3D3D3]/10 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-[#A9A9A9]">Tracked Entities</span>
+                    <button class="text-[#A9A9A9] hover:text-[#0033FF] transition-colors" title="Add Entity">
+                        <i class="ph ph-plus text-sm"></i>
+                    </button>
+                </div>
+
+                <div class="lib-group is-open mb-2">
+                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-[#D3D3D3] hover:text-white group" onclick="this.parentElement.classList.toggle('is-open')">
+                        <i class="ph ph-caret-right chevron text-xs text-[#A9A9A9]"></i>
+                        <span class="text-sm font-bold">Digital Security</span>
+                    </button>
+                    <div class="lib-content">
+                        <div class="lib-inner flex flex-col gap-1 pt-1">
+                            <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors">
+                                <div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9] group-hover:bg-[#D3D3D3]"></div>
+                                <span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">SentinelOne</span>
+                                <span class="ml-auto text-[10px] text-[#A9A9A9]">142</span>
+                            </div>
+                            <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded bg-[#0A192F] border border-[#D3D3D3]/10 cursor-pointer group transition-colors relative">
+                                <div class="absolute left-0 top-1/2 -translate-y-1/2 h-3/4 w-[2px] bg-[#0033FF]"></div>
+                                <div class="w-1.5 h-1.5 rounded-full bg-[#0033FF] shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div>
+                                <span class="text-sm text-white font-bold truncate">VaultX</span>
+                                <span class="ml-auto text-[10px] text-white bg-[#0033FF] px-1.5 py-[1px] rounded-[2px]">68</span>
+                            </div>
+                            <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors">
+                                <div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9] group-hover:bg-[#D3D3D3]"></div>
+                                <span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">Aura Labs</span>
+                                <span class="ml-auto text-[10px] text-[#A9A9A9]">215</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lib-group">
+                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-[#A9A9A9] hover:text-white group" onclick="this.parentElement.classList.toggle('is-open')">
+                        <i class="ph ph-caret-right chevron text-xs"></i>
+                        <span class="text-sm font-bold">Fintech</span>
+                    </button>
+                    <div class="lib-content">
+                        <div class="lib-inner flex flex-col gap-1 pt-1">
+                            <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors">
+                                <div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9]"></div>
+                                <span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">Nova Bank</span>
+                                <span class="ml-auto text-[10px] text-[#A9A9A9]">89</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="p-4 border-t border-[#D3D3D3]/10">
+            <p class="text-xs text-[#0033FF] mb-4 text-center font-bold tracking-tight">Clarity in the noise.</p>
+            <div class="flex items-center gap-3 w-full p-2 rounded hover:bg-[#0A192F] transition-colors cursor-pointer border border-transparent hover:border-[#D3D3D3]/10">
+                <div class="w-8 h-8 rounded bg-[#0A192F] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0">
+                    <i class="ph ph-user text-[#D3D3D3]"></i>
+                </div>
+                <div class="flex flex-col min-w-0">
+                    <span class="text-sm font-bold text-white truncate leading-none">Intelligence Admin</span>
+                    <span class="text-[10px] text-[#A9A9A9] uppercase tracking-wider mt-1">Enterprise Access</span>
+                </div>
+                <i class="ph ph-gear text-[#A9A9A9] hover:text-[#0033FF] ml-auto transition-colors"></i>
+            </div>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-[#040914]">
+        <header class="h-16 border-b border-[#D3D3D3]/10 bg-[#040914]/90 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30 shrink-0">
+            <div class="flex items-center gap-8 h-full">
+                <button class="md:hidden text-[#A9A9A9] hover:text-white">
+                    <i class="ph ph-list text-xl"></i>
+                </button>
+                <nav class="hidden md:flex items-center h-full gap-6">
+                    <button class="h-full flex items-center text-sm font-bold tab-inactive transition-colors relative">New Ads</button>
+                    <button class="h-full flex items-center text-sm font-bold tab-active transition-colors relative">Discover</button>
+                    <button class="h-full flex items-center text-sm font-bold tab-inactive transition-colors relative">Saved Insights</button>
+                </nav>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="hidden sm:flex relative group w-64">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#A9A9A9] group-focus-within:text-[#0033FF] transition-colors"></i>
+                    <input type="text" placeholder="Search parameters..." class="w-full bg-[#0A192F] border border-[#D3D3D3]/20 rounded py-1.5 pl-9 pr-3 text-sm text-white placeholder-[#A9A9A9] focus:outline-none focus:border-[#0033FF] transition-colors">
+                </div>
+                <div class="w-px h-5 bg-[#D3D3D3]/20 hidden md:block"></div>
+                <button class="relative text-[#A9A9A9] hover:text-white transition-colors">
+                    <i class="ph ph-bell text-lg"></i>
+                </button>
+                <button class="btn-primary px-4 py-1.5 rounded text-sm flex items-center gap-2">
+                    <i class="ph ph-plus"></i>
+                    <span class="hidden md:inline">Add Brand</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto w-full pb-20 relative p-6 md:p-8 custom-scrollbar">
+            <div class="max-w-[1400px] mx-auto w-full">
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 text-[#A9A9A9] text-xs uppercase tracking-widest font-bold">
+                            <span>Library</span>
+                            <span class="text-[10px]">/</span>
+                            <span class="text-[#0033FF]">VaultX</span>
+                        </div>
+                        <div class="flex items-baseline gap-3">
+                            <h1 class="text-5xl md:text-6xl text-white leading-none tracking-tighter">68</h1>
+                            <p class="text-[15px] text-[#D3D3D3] font-bold">Active Ads Detected</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <button class="flex items-center gap-2 bg-transparent border border-[#0033FF] text-[#D3D3D3] hover:text-white px-4 py-1.5 rounded text-sm transition-all focus:outline-none font-bold">
+                            <i class="ph ph-faders text-base"></i>
+                            Filter Parameters
+                        </button>
+                        <div class="relative group">
+                            <select class="appearance-none bg-[#0A192F] border border-[#D3D3D3]/20 text-white font-bold px-4 py-1.5 pr-8 rounded text-sm transition-all focus:outline-none focus:border-[#0033FF] cursor-pointer">
+                                <option>Sort: Newest First</option>
+                                <option>Sort: Longest Running</option>
+                                <option>Sort: Highest Velocity</option>
+                            </select>
+                            <i class="ph ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-[#A9A9A9] pointer-events-none text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+
+                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 1;">
+                        <div class="px-4 py-3 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0">
+                                    <span class="text-[10px] font-bold text-white">V</span>
+                                </div>
+                                <span class="text-sm font-bold text-white truncate">VaultX</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div>
+                                <span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-[#040914]/40 grow flex flex-col relative">
+                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-3 mb-2">
+                                Stop losing 40% of your B2B leads to complex security checks. Our new 1-click SSO integration secures endpoints without destroying conversion rates.
+                            </p>
+                            <button class="text-xs font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+                        </div>
+                        <div class="aspect-video relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors">
+                            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80" alt="Dashboard UI" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-60 mix-blend-luminosity">
+                            <div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                                <div class="w-10 h-10 bg-[#0A192F]/80 backdrop-blur-sm border border-[#0033FF] flex items-center justify-center text-white transform group-hover/card:scale-110 transition-transform rounded-sm">
+                                    <i class="ph ph-play text-lg"></i>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-2 right-2 z-10 bg-[#0A192F] px-1.5 py-0.5 rounded-sm text-[10px] text-white border border-[#D3D3D3]/20">0:45</div>
+                        </div>
+                        <div class="p-4 flex flex-col gap-3 bg-[#0A192F]">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="tracker-badge badge-winner"><i class="ph ph-target"></i> Proven Asset</span>
+                                <span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 45 Days</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-[#A9A9A9] mt-1 uppercase tracking-wider">
+                                <div><span class="text-[#D3D3D3] font-bold">FMT:</span> Video Reel</div>
+                                <div class="w-px h-3 bg-[#D3D3D3]/20"></div>
+                                <div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Efficiency</div>
+                            </div>
+                        </div>
+                        <a href="#" class="border-t border-[#D3D3D3]/10 px-4 py-3 flex items-center justify-between text-xs font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">
+                            Inspect Creative <i class="ph ph-arrow-right"></i>
+                        </a>
+                    </article>
+
+                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 2;">
+                        <div class="px-4 py-3 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0">
+                                    <span class="text-[10px] font-bold text-white">V</span>
+                                </div>
+                                <span class="text-sm font-bold text-white truncate">VaultX</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div>
+                                <span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-[#040914]/40 grow flex flex-col relative">
+                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-3 mb-2">
+                                Data leaks don't happen in the boardroom. They happen on unmanaged devices. Discover the architecture that quarantines malicious traffic in ms.
+                            </p>
+                            <button class="text-xs font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+                        </div>
+                        <div class="aspect-video relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors">
+                            <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=600&q=80" alt="Code Graph" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-50 grayscale">
+                            <div class="absolute inset-0 p-4 flex flex-col justify-center items-center text-center z-10 pointer-events-none">
+                                <h3 class="text-xl font-bold text-white leading-tight">Zero Trust.<br>Zero Friction.</h3>
+                                <div class="w-8 h-1 bg-[#0033FF] mt-3"></div>
+                            </div>
+                        </div>
+                        <div class="p-4 flex flex-col gap-3 bg-[#0A192F]">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="tracker-badge badge-scaling"><i class="ph ph-trend-up"></i> Scaling Output</span>
+                                <span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 12 Days</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-[#A9A9A9] mt-1 uppercase tracking-wider">
+                                <div><span class="text-[#D3D3D3] font-bold">FMT:</span> Static Graphic</div>
+                                <div class="w-px h-3 bg-[#D3D3D3]/20"></div>
+                                <div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Logic / Stats</div>
+                            </div>
+                        </div>
+                        <a href="#" class="border-t border-[#D3D3D3]/10 px-4 py-3 flex items-center justify-between text-xs font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">
+                            Inspect Creative <i class="ph ph-arrow-right"></i>
+                        </a>
+                    </article>
+
+                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 3;">
+                        <div class="px-4 py-3 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0">
+                                    <span class="text-[10px] font-bold text-white">V</span>
+                                </div>
+                                <span class="text-sm font-bold text-white truncate">VaultX</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div>
+                                <span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-[#040914]/40 grow flex flex-col relative">
+                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-3 mb-2">
+                                UGC style: "I'm the CISO for a Fortune 500 and here are the 3 tools I actually use." VaultX replaces 4 different legacy systems out of the box...
+                            </p>
+                            <button class="text-xs font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+                        </div>
+                        <div class="aspect-video relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors">
+                            <img src="https://images.unsplash.com/photo-1555702581-8153ce1fbba5?auto=format&fit=crop&w=600&q=80" alt="Person" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-60 grayscale">
+                            <div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                                <div class="w-10 h-10 bg-[#0033FF] flex items-center justify-center text-white transform group-hover/card:scale-110 transition-transform rounded-sm shadow-[0_0_15px_rgba(0,51,255,0.5)]">
+                                    <i class="ph ph-play text-lg"></i>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-2 right-2 z-10 bg-[#0A192F] px-1.5 py-0.5 rounded-sm text-[10px] text-white border border-[#D3D3D3]/20">1:12</div>
+                        </div>
+                        <div class="p-4 flex flex-col gap-3 bg-[#0A192F]">
+                            <div class="flex flex-wrap gap-2">
+                                <span class="tracker-badge badge-velocity"><i class="ph ph-rocket-launch"></i> High Velocity</span>
+                                <span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 3 Days</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-[#A9A9A9] mt-1 uppercase tracking-wider">
+                                <div><span class="text-[#D3D3D3] font-bold">FMT:</span> UGC Reel</div>
+                                <div class="w-px h-3 bg-[#D3D3D3]/20"></div>
+                                <div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Authority</div>
+                            </div>
+                        </div>
+                        <a href="#" class="border-t border-[#D3D3D3]/10 px-4 py-3 flex items-center justify-between text-xs font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">
+                            Inspect Creative <i class="ph ph-arrow-right"></i>
+                        </a>
+                    </article>
+
+                </div>
+
+                <div class="w-full py-16 flex flex-col justify-center items-center gap-4">
+                    <div class="flex gap-2">
+                        <div class="w-1.5 h-6 bg-[#A9A9A9] animate-pulse rounded-sm" style="animation-delay: 0ms"></div>
+                        <div class="w-1.5 h-6 bg-[#D3D3D3] animate-pulse rounded-sm" style="animation-delay: 150ms"></div>
+                        <div class="w-1.5 h-6 bg-[#0033FF] animate-pulse rounded-sm shadow-[0_0_10px_rgba(0,51,255,0.6)]" style="animation-delay: 300ms"></div>
+                    </div>
+                    <span class="text-[10px] uppercase tracking-widest text-[#A9A9A9] font-bold">Parsing Network Data</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+</body>
+</html>
