@@ -127,18 +127,24 @@ reduced-motion.
 
 ---
 
-## 5 — How the rules map to the toolchain
+## 5 — How the rules map to the toolchain (`design.sh` is the spine)
 
-| Phase | Command (see SKILL.md for full args) |
+The process is wired into ONE command surface, `scripts/design.sh`. The principles aren't a
+doc you remember — **`aidesigner.js` auto-injects the craft brief (§3, from `design-brief.md`)
+and the naming convention (§2) into EVERY generate/refine.** Design HTML always flows API→file,
+never through model output.
+
+| Phase | Command |
 |---|---|
-| References | `adspy-live-shot.sh` · `aidesigner.js gen … --mode=enhance --url=…` |
-| Directions | `aidesigner.js gen <f> --title="Ad Spy — <Surface> — <Direction> v1" --brand=…` |
-| Critique | judge against §3 |
-| Iterate | `aidesigner.js refine <f> --run=<id> --target=<canvas_id>` → `publish-staging.sh` |
-| Review | staging URL + Webvizio (`wv.sh pull`) |
-| Ship | full-template port → `adspy-deploy-reskin.sh` (backup + verify + `--rollback`) |
+| 2 · References | `design.sh shot` — snapshot the current app |
+| 3 · Directions | `design.sh new <Surface> <Direction> <prompt-file> [refURL]` — named canvas, brief + brand auto-applied, published to staging |
+| 4 · Critique | judge against §3 (your call) |
+| 5 · Iterate | `design.sh iterate <run_id> <canvas_id> <feedback-file>` — overwrites the canvas in place, re-publishes |
+| 6 · Review | `design.sh review` — pull Webvizio comments + screenshots |
+| Ship | `design.sh ship <ported-real-index.html>` — full-template port → backup + verify + rollback |
 
-Design HTML always flows **API → file** (`aidesigner.js`), never through model output.
+You supply judgment (the brief, the prompt/feedback text, the critique). The tools supply the
+conventions, the craft brief, the naming, and the plumbing — so it's systematic every time.
 
 ---
 

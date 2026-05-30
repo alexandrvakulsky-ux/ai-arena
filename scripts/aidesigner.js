@@ -25,6 +25,15 @@ const { execSync } = require('child_process');
 
 const ENDPOINT = 'https://api.aidesigner.ai/api/v1/mcp';
 const HEADERS_HELPER = process.env.AIDESIGNER_HEADERS_HELPER || '/home/node/.claude/scripts/aidesigner-headers.sh';
+// The standing craft brief (DESIGN-PLAYBOOK §3) auto-injected into every gen/refine
+// so AIDesigner always designs to our principles. Skip with --no-brief.
+const BRIEF_FILE = process.env.AIDESIGNER_BRIEF || '/workspace/.claude/skills/adspy-design-pipeline/design-brief.md';
+function brief() { try { return require('fs').readFileSync(BRIEF_FILE, 'utf8').trim(); } catch { return ''; } }
+function titleFrom(flags) {
+  if (flags.title) return flags.title;
+  if (flags.surface && flags.direction) return `Ad Spy — ${flags.surface} — ${flags.direction} v${flags.v || 1}`;
+  return null;
+}
 
 function fail(msg) { process.stdout.write(JSON.stringify({ ok: false, error: msg }) + '\n'); process.exit(1); }
 function out(o) { process.stdout.write(JSON.stringify(o) + '\n'); }
@@ -125,12 +134,14 @@ async function main() {
     return out({ ok: true, canvas_id: id, file: outPath, bytes });
   }
   if (cmd === 'gen') {
-    const outPath = pos[0]; if (!outPath || !flags['prompt-file']) fail('usage: gen <out.html> --prompt-file=P [--title="Name"] [--repo-file=R] [--brand=ID] [--viewport=] [--mode= --url=]');
-    let prompt = readFileArg(flags['prompt-file']);
-    // Naming logic: the editor canvas name is derived from the design <title>.
-    // Always pass a distinct --title so layouts are named clearly (not "Untitled"/dupes).
-    if (flags.title) prompt = `Name this design exactly "${flags.title}": use it verbatim as the HTML <title> element and the document's main heading, so the editor canvas is named "${flags.title}".\n\n` + prompt;
-    const args = { prompt, repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
+    const outPath = pos[0]; if (!outPath || !flags['prompt-file']) fail('usage: gen <out.html> --prompt-file=P [--surface=S --direction=D [--v=N] | --title="Name"] [--no-brief] [--repo-file=R] [--brand=ID] [--viewport=] [--mode= --url=]');
+    const title = titleFrom(flags);
+    if (!title) process.stderr.write('[aidesigner] WARN: no --title (or --surface+--direction) — canvas will be auto-named/duped. Name layouts per the playbook.\n');
+    const parts = [];
+    if (title) parts.push(`Name this design exactly "${title}": use it verbatim as the HTML <title> element and the document's main heading.`);
+    if (!flags['no-brief']) { const b = brief(); if (b) parts.push(b); }
+    parts.push('=== THIS REQUEST ===\n' + readFileArg(flags['prompt-file']));
+    const args = { prompt: parts.join('\n\n'), repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
     if (flags.brand) args.brand_kit_id = flags.brand;
     if (flags.viewport) args.viewport = flags.viewport;
     if (flags.mode) { args.mode = flags.mode; if (flags.url) args.url = flags.url; }
@@ -140,11 +151,12 @@ async function main() {
   }
   if (cmd === 'refine') {
     const outPath = pos[0]; if (!outPath || !flags.run || !flags['feedback-file']) fail('usage: refine <out.html> --run=RUN --feedback-file=F [--target=CANVAS_ID(overwrite in place — USE for iterations)] [--title="Name"(new-canvas only)] [--repo-file=R] [--brand=ID] [--viewport=]');
-    let feedback = readFileArg(flags['feedback-file']);
-    // Iterations should OVERWRITE (--target) so canvases don't pile up. A new
-    // canvas (no --target) is only for a genuinely new direction → give it a --title.
-    if (flags.title && !flags.target) feedback = `Name this design exactly "${flags.title}" (use as the <title> and main heading).\n\n` + feedback;
-    const args = { run_id_or_html: flags.run, feedback, repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
+    const parts = [];
+    const title = (!flags.target) ? titleFrom(flags) : null; // naming only matters for a NEW canvas
+    if (title) parts.push(`Name this design exactly "${title}" (use as the <title> and main heading).`);
+    if (!flags['no-brief']) { const b = brief(); if (b) parts.push('Keep honoring the standing craft brief:\n' + b); }
+    parts.push('=== CHANGES REQUESTED ===\n' + readFileArg(flags['feedback-file']));
+    const args = { run_id_or_html: flags.run, feedback: parts.join('\n\n'), repo_context: flags['repo-file'] ? readFileArg(flags['repo-file']) : 'ad-spy design' };
     if (flags.brand) args.brand_kit_id = flags.brand;
     if (flags.target) args.target_canvas_id = flags.target;
     if (flags.viewport) args.viewport = flags.viewport;

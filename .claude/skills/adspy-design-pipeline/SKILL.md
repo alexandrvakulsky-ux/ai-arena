@@ -26,6 +26,8 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 ```
 
 ## Helper scripts (in /workspace/scripts) — use these, don't hand-roll
+**`design.sh` is the spine** — it walks the playbook phases (`shot`/`new`/`iterate`/`review`/`ship`) and auto-applies the craft brief, naming convention, and brand kit on every step. Prefer it; the scripts below are what it calls.
+
 | Script | Runs in | Purpose |
 |---|---|---|
 | `aidesigner.js <gen\|refine\|canvas\|latest\|list\|credits>` | ai-arena | The AIDesigner CLI. **Drives generate/refine/get_canvas over the API so design HTML goes straight to a FILE, never into context** — returns only `{run_id,canvas_id,file}`. Editor delivery still works. USE THIS for gen/refine/fetch, NOT the MCP generate_design/refine_design (those dump ~600 lines of HTML into context). NEVER hand-write canvas HTML. |
