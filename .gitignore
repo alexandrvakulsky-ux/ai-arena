@@ -20,3 +20,6 @@ public/aidesigner-*.html
 public/compare/
 .deploy-backups/
 .claude/designs/
+agents/scout-bot/.authorized_users.json
+agents/scout-bot/memory/vectors.jsonl
+agents/scout-bot/bot.js.bak-*

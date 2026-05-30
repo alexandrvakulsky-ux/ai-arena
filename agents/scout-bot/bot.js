@@ -34,6 +34,7 @@ const { execSync } = require('child_process');
 const FormData = require('form-data');
 let YoutubeTranscript;
 try { YoutubeTranscript = require('youtube-transcript').YoutubeTranscript; } catch {}
+const vectorstore = require('./vectorstore');
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PASSPHRASE = process.env.TELEGRAM_PASSPHRASE || 'futureproof-scout';
@@ -98,6 +99,53 @@ function authorizedChatId() {
 function setAuthorizedChatId(id) {
   fs.writeFileSync(AUTH_FILE, String(id));
   console.log(`[scout-bot] authorized chat_id=${id}`);
+}
+
+// ── Multi-user (Alex=CEO + CMO wife), ONE shared brain ──────────────────
+const USERS_FILE = path.join(BOT_DIR, '.authorized_users.json');
+function loadUsers() {
+  try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); }
+  catch {
+    const legacy = authorizedChatId(); // migrate the single-chat file
+    const seed = legacy ? { [legacy]: 'alex' } : {};
+    if (legacy) { try { fs.writeFileSync(USERS_FILE, JSON.stringify(seed, null, 2)); } catch {} }
+    return seed;
+  }
+}
+function saveUsers(u) { try { fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2)); } catch {} }
+function userLabel(chat_id) { return loadUsers()[chat_id] || null; }
+function enrollUser(chat_id) {
+  const u = loadUsers();
+  if (u[chat_id]) return u[chat_id];
+  const taken = Object.values(u);
+  const label = !taken.includes('alex') ? 'alex' : !taken.includes('cmo') ? 'cmo' : 'guest';
+  u[chat_id] = label; saveUsers(u);
+  console.log(`[scout-bot] enrolled chat ${chat_id} as ${label}`);
+  return label;
+}
+let CURRENT_USER = 'alex';
+function mediationBlock() {
+  const who = CURRENT_USER === 'cmo' ? "the CMO (Alex's wife)" : CURRENT_USER === 'alex' ? 'Alex (CEO)' : CURRENT_USER;
+  return `
+
+═══ SHARED SECOND BRAIN — TWO PRINCIPALS ═══
+You serve TWO people at Futureproof who share THIS SAME memory + knowledge base:
+- Alex — CEO (product, architecture, roadmap, technical, partnerships)
+- CMO — Alex's wife (marketing, ads, copy, messaging, campaigns, funnel, creative, pricing)
+You are currently talking to: ${who}.
+
+SILENT MEDIATION (critical): when their views/instructions differ, do NOT surface the conflict
+("Alex said X but CMO said Y"). Internally synthesize both like a consultant, form your own
+recommendation, and only escalate if you genuinely cannot reconcile — and then come WITH a
+proposed resolution, never just "you disagree".
+
+DOMAIN WEIGHT MATRIX (apply subtly in internal reasoning; NEVER expose the numbers):
+- Marketing / ads / copy / funnel / creative: CMO 70%, CEO 30%
+- Pricing / monetization: CMO 60%, CEO 40%
+- Product / architecture / roadmap / tech: CEO 70%, CMO 30%
+Weights reflect expertise, not hierarchy. Her marketing/funnel research feeds his product
+decisions; his product insight feeds her marketing. One brain, two perspectives. Attribute what
+you learn to who said it; both can recall everything.`;
 }
 
 // ── Telegram client ──────────────────────────────────────────────────────
@@ -419,7 +467,7 @@ async function generateReply(chat_id, userMessage, systemOverride = null) {
         body: JSON.stringify({
           model: MODEL,
           max_tokens: 3000,
-          system: systemOverride || buildSystemPrompt(),
+          system: (systemOverride || buildSystemPrompt()) + mediationBlock(),
           messages,
           tools: [
             { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
@@ -579,16 +627,17 @@ async function handleMessage(msg) {
   const text = content || ''; // for command parsing / passphrase check
   const isEmpty = content === null;
 
-  const authed = authorizedChatId();
-  if (authed === null) {
+  let label = userLabel(chat_id);
+  if (!label) {
     if (text.includes(PASSPHRASE)) {
-      setAuthorizedChatId(chat_id);
-      await sendMessage(chat_id, `Authorized — locked to this chat.\n\nI'm your AI Chief of Staff for Futureproof, ad-spy, and ai-arena. Cadence:\n- Mon-Fri 7am UTC: short daily check-in\n- Mon 9am: MCP scout + planning\n- Thu 9am: Futureproof intel\n- Sun 5pm: weekly wrap-up\n- Anytime: ping me a question\n\nFirst question: what's the most pressing thing on your plate this week?\n\nType /help for commands.`);
+      label = enrollUser(chat_id);
+      const who = label === 'cmo' ? 'CMO (marketing lead)' : label === 'alex' ? 'CEO' : 'guest';
+      await sendMessage(chat_id, `Authorized as ${who}. We share one second brain — memory, ad-spy/ai-arena tools, and find history are common to both you and ${label === 'alex' ? 'the CMO' : 'Alex'}. Ping me anytime, send voice notes or YouTube links, ask "what did we decide about X". Type /help for commands.`);
       return;
     }
-    return;
+    return; // unknown chat, no passphrase — ignore
   }
-  if (chat_id !== authed) return;
+  CURRENT_USER = label;
 
   // Empty / media-only messages (sticker, photo no caption, etc): be polite.
   if (isEmpty) {
@@ -634,8 +683,16 @@ async function handleMessage(msg) {
   }
 
   // Capture short user content to journal so future questions can reference it.
-  // Use `content` (extracted, includes forward headers) — never empty here.
-  if (content.length > 5 && content.length < 2000) appendJournal(`Alex: ${content.slice(0, 500)}`);
+  if (content.length > 5 && content.length < 2000) appendJournal(`${CURRENT_USER}: ${content.slice(0, 500)}`);
+
+  // Shared semantic memory: store every message; recall on recall-style questions.
+  if (vectorstore.enabled()) {
+    vectorstore.store('user', content, CURRENT_USER).catch(() => {});
+    if (vectorstore.looksLikeRecall(text)) {
+      const hits = await vectorstore.recall(content, 5);
+      if (hits.length) content += `\n\n[Recalled from shared second-brain memory]\n` + hits.map((hh) => `- (${hh.user}) ${hh.content}`).join('\n');
+    }
+  }
 
   await tg('sendChatAction', { chat_id, action: 'typing' });
   const reply = await generateReply(chat_id, content);
@@ -727,7 +784,7 @@ async function fireCadence(cadence) {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 400,
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt() + mediationBlock(),
         messages: [{ role: 'user', content: instructions }],
       }),
       timeout: 30000,
