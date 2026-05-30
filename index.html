@@ -1,229 +1,499 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="antialiased">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ad Spy | Competitive Ad Intelligence</title>
+    <title>Ad Spy - Competitive Intelligence</title>
+    <!-- 
+      aesthetic_dna: Premium SaaS, High-Density Analytics, Fintech-Grade
+      ui_paradigm: Multi-panel Workspace / Data Grid
+      palette: Ink Navy (Dark variant), Electric Blue accent, Cool Grays
+    -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --accent-primary: #0033FF; --brand-dark-navy: #0A192F; --brand-light-gray: #D3D3D3;
-            --brand-medium-gray: #A9A9A9; --brand-white: #FFFFFF;
-            --bg-canvas: #040914; --bg-panel: #0A192F; --bg-panel-hover: #0E2240;
-            --border-subtle: rgba(211, 211, 211, 0.1); --border-highlight: rgba(0, 51, 255, 0.4);
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"DM Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        canvas: '#0B0F1A',
+                        panel: '#121826',
+                        raised: '#161D2E',
+                        'text-primary': '#EAEDF3',
+                        'text-secondary': '#9BA4B5',
+                        'text-faint': '#6B7488',
+                        'brand-blue': '#285BFF', /* Ad Spy Electric Blue */
+                    },
+                    boxShadow: {
+                        'card': '0 4px 20px -2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+                        'card-hover': '0 12px 30px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                        'btn-inner': 'inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in-up': 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: 0, transform: 'translateY(10px)' },
+                            '100%': { opacity: 1, transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
         }
-        body { font-family: 'DM Sans', sans-serif; background-color: var(--bg-canvas); color: var(--brand-white); -webkit-font-smoothing: antialiased; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: rgba(10, 25, 47, 0.5); }
-        ::-webkit-scrollbar-thumb { background: var(--brand-medium-gray); border-radius: 0px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
-        .data-panel { background: var(--bg-panel); border: 1px solid var(--border-subtle); transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
-        .data-panel:hover { border-color: var(--border-highlight); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(0, 51, 255, 0.1); transform: translateY(-2px); }
-        @keyframes revealData { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-cascade { animation: revealData 0.4s cubic-bezier(0.25, 1, 0.5, 1) both; animation-delay: calc(var(--idx) * 60ms); }
-        .tracker-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; border-radius: 2px; border: 1px solid transparent; }
-        .badge-winner { background: rgba(0, 51, 255, 0.1); color: #4D7BFF; border-color: rgba(0, 51, 255, 0.3); }
-        .badge-scaling { background: transparent; color: var(--brand-white); border-color: var(--border-subtle); }
-        .badge-velocity { background: var(--accent-primary); color: var(--brand-white); box-shadow: 0 0 10px rgba(0,51,255,0.4); }
-        .badge-neutral { background: rgba(211, 211, 211, 0.05); color: var(--brand-medium-gray); border-color: rgba(211, 211, 211, 0.1); }
-        .lib-content { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .lib-group.is-open .lib-content { grid-template-rows: 1fr; }
-        .lib-inner { overflow: hidden; }
-        .chevron { transition: transform 0.2s ease; }
-        .lib-group.is-open .chevron { transform: rotate(90deg); }
-        .img-tint { position: relative; }
-        .img-tint::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, var(--bg-panel) 0%, rgba(10,25,47,0.3) 100%); mix-blend-mode: multiply; pointer-events: none; }
-        h1, h2, h3, h4, h5, h6, .bold-text { font-weight: 700; }
-        .btn-primary { background-color: var(--accent-primary); color: var(--brand-white); font-weight: 700; transition: all 0.2s; }
-        .btn-primary:hover { background-color: #0029CC; box-shadow: 0 4px 15px rgba(0, 51, 255, 0.3); }
-        .tab-active { color: var(--brand-white); border-bottom: 2px solid var(--accent-primary); }
-        .tab-inactive { color: var(--brand-medium-gray); border-bottom: 2px solid transparent; }
-        .tab-inactive:hover { color: var(--brand-light-gray); }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #161D2E;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2D3748;
+        }
+
+        /* Subtle Background Dot Pattern - Signal Grid representation */
+        .bg-pattern {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Animation Staggering for Cards */
+        .stagger-1 { animation-delay: 50ms; }
+        .stagger-2 { animation-delay: 100ms; }
+        .stagger-3 { animation-delay: 150ms; }
+        .stagger-4 { animation-delay: 200ms; }
+        .stagger-5 { animation-delay: 250ms; }
+        .stagger-6 { animation-delay: 300ms; }
+        
+        /* Line truncation for exact heights */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+
+        /* Ensure hardware acceleration on hover elements */
+        .gpu-accelerated {
+            transform: translateZ(0);
+            will-change: transform, box-shadow, border-color;
+        }
     </style>
 </head>
-<body class="h-[100dvh] flex overflow-hidden w-full mx-auto max-w-[1920px]">
+<body class="bg-canvas text-text-primary h-screen w-full overflow-hidden flex font-sans text-[15px] leading-relaxed">
 
-    <aside class="w-[260px] flex-shrink-0 bg-[#040914] border-r border-[#D3D3D3]/10 flex-col hidden md:flex z-20 relative">
-        <div class="h-16 flex items-center px-6 border-b border-[#D3D3D3]/10 shrink-0">
-            <div class="flex items-center gap-3 w-full">
-                <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-[#0033FF]">
-                    <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M 85 50 A 35 35 0 0 1 15 50" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-dasharray="10 15"/>
-                    <path d="M 28 50 A 22 22 0 1 1 72 50 A 22 22 0 1 1 28 50" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-dasharray="50 15"/>
-                    <circle cx="50" cy="50" r="8" fill="currentColor"/>
-                    <line x1="0" y1="50" x2="6" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-                    <line x1="94" y1="50" x2="100" y2="50" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+    <!-- Pattern Overlay for entire app depth -->
+    <div class="fixed inset-0 pointer-events-none bg-pattern z-0 mix-blend-overlay"></div>
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="w-64 max-w-[16rem] bg-canvas border-r border-white/[0.06] flex flex-col h-full z-10 relative shrink-0">
+        <!-- Logo Area -->
+        <div class="h-16 flex items-center px-6 mt-2">
+            <div class="flex items-center gap-3">
+                <!-- Abstracted Fingerprint Logo SVG for dark mode -->
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-brand-blue">
+                    <path d="M16 4C19.1826 4 22.2348 5.26428 24.4853 7.51472C26.7357 9.76516 28 12.8174 28 16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M16 8C18.1217 8 20.1566 8.84285 21.6569 10.3431C23.1571 11.8434 24 13.8783 24 16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M16 12C17.0609 12 18.0783 12.4214 18.8284 13.1716C19.5786 13.9217 20 14.9391 20 16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M4 16C4 22.6274 9.37258 28 16 28C19.3137 28 22.3137 26.6569 24.4853 24.4853" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M8 16C8 20.4183 11.5817 24 16 24C18.2091 24 20.2091 23.1046 21.6569 21.6569" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                    <circle cx="16" cy="16" r="2" fill="currentColor"/>
                 </svg>
-                <span class="text-xl font-bold tracking-tight text-white leading-none">Ad Spy</span>
+                <span class="text-xl font-bold tracking-tight text-white mt-0.5">Ad Spy</span>
             </div>
         </div>
-        <nav class="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-8">
-            <div class="space-y-1">
-                <button class="w-full flex items-center gap-3 px-3 py-2 text-[#A9A9A9] hover:text-white hover:bg-[#0A192F] rounded transition-colors group"><i class="ph ph-squares-four text-lg group-hover:text-[#0033FF]"></i><span class="text-sm">Overview</span></button>
-                <button class="w-full flex items-center gap-3 px-3 py-2 text-white bg-[#0A192F] rounded transition-colors group border border-[#D3D3D3]/5"><i class="ph ph-funnel text-[#0033FF] text-lg"></i><span class="text-sm font-bold">Ad Library</span></button>
-                <button class="w-full flex items-center gap-3 px-3 py-2 text-[#A9A9A9] hover:text-white hover:bg-[#0A192F] rounded transition-colors group"><i class="ph ph-chart-bar text-lg group-hover:text-[#0033FF]"></i><span class="text-sm">Market Trends</span></button>
-            </div>
-            <div>
-                <div class="flex items-center justify-between px-3 mb-3 border-b border-[#D3D3D3]/10 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-[#A9A9A9]">Tracked Entities</span>
-                    <button class="text-[#A9A9A9] hover:text-[#0033FF] transition-colors" title="Add Entity"><i class="ph ph-plus text-sm"></i></button>
+
+        <div class="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-8">
+            <!-- Navigation -->
+            <nav class="flex flex-col gap-1">
+                <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md bg-white/[0.04] text-white font-medium transition-colors border border-white/[0.02]">
+                    <i class="ph ph-squares-four text-lg text-text-secondary"></i>
+                    Overview
+                </a>
+                <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md text-text-secondary hover:text-white hover:bg-white/[0.02] transition-colors">
+                    <i class="ph ph-trend-up text-lg"></i>
+                    Trends & Analytics
+                </a>
+                <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md text-text-secondary hover:text-white hover:bg-white/[0.02] transition-colors">
+                    <i class="ph ph-bookmark-simple text-lg"></i>
+                    Saved Creatives
+                </a>
+            </nav>
+
+            <!-- Group 1 -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between px-3 mb-1">
+                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-text-faint">Digital Security</h3>
+                    <button class="text-text-faint hover:text-white transition-colors"><i class="ph ph-plus"></i></button>
                 </div>
-                <div class="lib-group is-open mb-2">
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-[#D3D3D3] hover:text-white group" onclick="this.parentElement.classList.toggle('is-open')"><i class="ph ph-caret-right chevron text-xs text-[#A9A9A9]"></i><span class="text-sm font-bold">Digital Security</span></button>
-                    <div class="lib-content"><div class="lib-inner flex flex-col gap-1 pt-1">
-                        <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors"><div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9] group-hover:bg-[#D3D3D3]"></div><span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">SentinelOne</span><span class="ml-auto text-[10px] text-[#A9A9A9]">142</span></div>
-                        <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded bg-[#0A192F] border border-[#D3D3D3]/10 cursor-pointer group transition-colors relative"><div class="absolute left-0 top-1/2 -translate-y-1/2 h-3/4 w-[2px] bg-[#0033FF]"></div><div class="w-1.5 h-1.5 rounded-full bg-[#0033FF] shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div><span class="text-sm text-white font-bold truncate">VaultX</span><span class="ml-auto text-[10px] text-white bg-[#0033FF] px-1.5 py-[1px] rounded-[2px]">68</span></div>
-                        <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors"><div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9] group-hover:bg-[#D3D3D3]"></div><span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">Aura Labs</span><span class="ml-auto text-[10px] text-[#A9A9A9]">215</span></div>
-                    </div></div>
-                </div>
-                <div class="lib-group">
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-[#A9A9A9] hover:text-white group" onclick="this.parentElement.classList.toggle('is-open')"><i class="ph ph-caret-right chevron text-xs"></i><span class="text-sm font-bold">Fintech</span></button>
-                    <div class="lib-content"><div class="lib-inner flex flex-col gap-1 pt-1">
-                        <div class="flex items-center gap-3 py-1.5 px-3 pl-8 rounded hover:bg-[#0A192F] cursor-pointer group transition-colors"><div class="w-1.5 h-1.5 rounded-full bg-[#A9A9A9]"></div><span class="text-sm text-[#A9A9A9] group-hover:text-white truncate">Nova Bank</span><span class="ml-auto text-[10px] text-[#A9A9A9]">89</span></div>
-                    </div></div>
+                <div class="flex flex-col gap-0.5">
+                    <a href="#" class="group flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-white/[0.02] transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
+                            <span class="text-text-secondary group-hover:text-text-primary transition-colors">Auth0</span>
+                        </div>
+                        <span class="text-xs text-text-faint tabular-nums">42</span>
+                    </a>
+                    <a href="#" class="group flex items-center justify-between px-3 py-1.5 rounded-md bg-white/[0.03] border border-white/[0.02] relative">
+                        <div class="absolute left-[-17px] top-1/2 -translate-y-1/2 w-[2px] h-4 bg-brand-blue rounded-r"></div>
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#FF9F0A]"></span>
+                            <span class="text-text-primary font-medium">Okta</span>
+                        </div>
+                        <span class="text-xs text-text-secondary font-medium tabular-nums">142</span>
+                    </a>
+                    <a href="#" class="group flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-white/[0.02] transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#5E5CE6]"></span>
+                            <span class="text-text-secondary group-hover:text-text-primary transition-colors">Duo Security</span>
+                        </div>
+                        <span class="text-xs text-text-faint tabular-nums text-right">8</span>
+                    </a>
                 </div>
             </div>
-        </nav>
-        <div class="p-4 border-t border-[#D3D3D3]/10">
-            <p class="text-xs text-[#0033FF] mb-4 text-center font-bold tracking-tight">Clarity in the noise.</p>
-            <div class="flex items-center gap-3 w-full p-2 rounded hover:bg-[#0A192F] transition-colors cursor-pointer border border-transparent hover:border-[#D3D3D3]/10">
-                <div class="w-8 h-8 rounded bg-[#0A192F] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0"><i class="ph ph-user text-[#D3D3D3]"></i></div>
-                <div class="flex flex-col min-w-0"><span class="text-sm font-bold text-white truncate leading-none">Intelligence Admin</span><span class="text-[10px] text-[#A9A9A9] uppercase tracking-wider mt-1">Enterprise Access</span></div>
-                <i class="ph ph-gear text-[#A9A9A9] hover:text-[#0033FF] ml-auto transition-colors"></i>
+
+            <!-- Group 2 -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between px-3 mb-1">
+                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-text-faint">Fintech</h3>
+                    <button class="text-text-faint hover:text-white transition-colors"><i class="ph ph-plus"></i></button>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                    <a href="#" class="group flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-white/[0.02] transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#FF375F]"></span>
+                            <span class="text-text-secondary group-hover:text-text-primary transition-colors">Stripe</span>
+                        </div>
+                        <span class="text-xs text-text-faint tabular-nums">84</span>
+                    </a>
+                    <a href="#" class="group flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-white/[0.02] transition-colors">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#64D2FF]"></span>
+                            <span class="text-text-secondary group-hover:text-text-primary transition-colors">Plaid</span>
+                        </div>
+                        <span class="text-xs text-text-faint tabular-nums text-right">29</span>
+                    </a>
+                </div>
             </div>
+        </div>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-white/[0.06] mt-auto">
+            <button class="flex items-center gap-3 w-full hover:bg-white/[0.03] p-2 rounded-md transition-colors text-left">
+                <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=100&h=100&q=80" alt="User Avatar" class="w-8 h-8 rounded-full border border-white/10 shrink-0">
+                <div class="flex flex-col flex-1 truncate">
+                    <span class="text-sm font-medium text-white truncate">Marcus Chen</span>
+                    <span class="text-xs text-brand-blue font-medium">Pro Plan</span>
+                </div>
+                <i class="ph ph-caret-up text-text-faint"></i>
+            </button>
         </div>
     </aside>
 
-    <div class="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-[#040914]">
-        <header class="h-16 border-b border-[#D3D3D3]/10 bg-[#040914]/90 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30 shrink-0">
+    <!-- MAIN CONTENT AREA -->
+    <div class="flex-1 flex flex-col min-w-0 relative z-10 bg-canvas">
+        
+        <!-- TOP BAR -->
+        <header class="h-16 flex items-center justify-between px-8 border-b border-white/[0.06] bg-canvas/90 backdrop-blur-md sticky top-0 z-20">
+            <!-- Tabs -->
             <div class="flex items-center gap-8 h-full">
-                <button class="md:hidden text-[#A9A9A9] hover:text-white"><i class="ph ph-list text-xl"></i></button>
-                <nav class="hidden md:flex items-center h-full gap-6">
-                    <button class="h-full flex items-center text-sm font-bold tab-inactive transition-colors relative">New Ads</button>
-                    <button class="h-full flex items-center text-sm font-bold tab-active transition-colors relative">Discover</button>
-                    <button class="h-full flex items-center text-sm font-bold tab-inactive transition-colors relative">Saved Insights</button>
-                </nav>
+                <button class="relative h-full flex items-center text-sm font-medium text-white hover:text-white transition-colors group">
+                    New Ads (24)
+                    <div class="absolute bottom-[-1px] left-0 w-full h-[2px] bg-brand-blue rounded-t"></div>
+                </button>
+                <button class="relative h-full flex items-center text-sm text-text-secondary hover:text-white transition-colors group">
+                    Today's Top Performers
+                </button>
+                <button class="relative h-full flex items-center text-sm text-text-secondary hover:text-white transition-colors group">
+                    Discover Matrix
+                </button>
             </div>
+
+            <!-- Global Actions -->
             <div class="flex items-center gap-4">
-                <div class="hidden sm:flex relative group w-64">
-                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#A9A9A9] group-focus-within:text-[#0033FF] transition-colors"></i>
-                    <input type="text" placeholder="Search parameters..." class="w-full bg-[#0A192F] border border-[#D3D3D3]/20 rounded py-1.5 pl-9 pr-3 text-sm text-white placeholder-[#A9A9A9] focus:outline-none focus:border-[#0033FF] transition-colors">
+                <!-- Search -->
+                <div class="relative group">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-text-faint group-focus-within:text-white transition-colors"></i>
+                    <input type="text" placeholder="Search brands, ad copy, or tags..." 
+                           class="w-64 bg-panel border border-white/[0.08] rounded-md py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-text-faint focus:outline-none focus:border-white/20 focus:ring-1 focus:ring-white/20 transition-all shadow-inner">
                 </div>
-                <div class="w-px h-5 bg-[#D3D3D3]/20 hidden md:block"></div>
-                <button class="relative text-[#A9A9A9] hover:text-white transition-colors"><i class="ph ph-bell text-lg"></i></button>
-                <button class="btn-primary px-4 py-1.5 rounded text-sm flex items-center gap-2"><i class="ph ph-plus"></i><span class="hidden md:inline">Add Brand</span></button>
+                <!-- Primary Action -->
+                <button class="bg-brand-blue hover:bg-[#1f48d9] text-white text-sm font-medium px-4 py-1.5 rounded-md transition-all shadow-btn-inner flex items-center gap-2 active:scale-95">
+                    <i class="ph ph-plus-circle text-lg"></i>
+                    Add Brand
+                </button>
             </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto w-full pb-20 relative p-6 md:p-8">
-            <div class="max-w-[1600px] mx-auto w-full">
-                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-                    <div class="flex flex-col gap-2">
-                        <div class="flex items-center gap-2 text-[#A9A9A9] text-xs uppercase tracking-widest font-bold"><span>Library</span><span class="text-[10px]">/</span><span class="text-[#0033FF]">VaultX</span></div>
-                        <div class="flex items-baseline gap-3"><h1 class="text-5xl md:text-6xl text-white leading-none tracking-tighter">68</h1><p class="text-[15px] text-[#D3D3D3] font-bold">Active Ads Detected</p></div>
+        <!-- SCROLLABLE WORKSPACE -->
+        <main class="flex-1 overflow-y-auto p-8 relative">
+            
+            <div class="max-w-[1400px] mx-auto flex flex-col gap-8">
+                
+                <!-- Main Header & Controls -->
+                <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="w-2 h-2 rounded-full bg-brand-blue shadow-[0_0_10px_rgba(40,91,255,0.6)] animate-pulse-slow"></span>
+                            <span class="text-xs font-bold uppercase tracking-widest text-text-faint">Live Sync Active</span>
+                        </div>
+                        <h1 class="text-5xl font-bold tracking-tighter text-white flex items-baseline gap-3 tabular-nums">
+                            142 
+                            <span class="text-2xl font-medium text-text-secondary tracking-normal">Active Ads Detected</span>
+                        </h1>
+                        <p class="text-text-secondary mt-1">Showing all live creatives for <strong class="text-text-primary font-medium">Okta</strong> across Meta and LinkedIn.</p>
                     </div>
+
+                    <!-- Filters / Sort -->
                     <div class="flex items-center gap-3 shrink-0">
-                        <button class="flex items-center gap-2 bg-transparent border border-[#0033FF] text-[#D3D3D3] hover:text-white px-4 py-1.5 rounded text-sm transition-all focus:outline-none font-bold"><i class="ph ph-faders text-base"></i>Filter Parameters</button>
-                        <div class="relative group">
-                            <select class="appearance-none bg-[#0A192F] border border-[#D3D3D3]/20 text-white font-bold px-4 py-1.5 pr-8 rounded text-sm transition-all focus:outline-none focus:border-[#0033FF] cursor-pointer"><option>Sort: Newest First</option><option>Sort: Longest Running</option><option>Sort: Highest Velocity</option></select>
-                            <i class="ph ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-[#A9A9A9] pointer-events-none text-xs"></i>
-                        </div>
+                        <button class="flex items-center gap-2 bg-panel border border-white/[0.08] hover:border-white/[0.15] text-text-secondary hover:text-white px-3 py-1.5 rounded-md text-sm transition-all shadow-sm">
+                            <i class="ph ph-funnel"></i> Filters 
+                            <span class="bg-white/10 text-white text-[10px] px-1.5 py-0.5 rounded leading-none ml-1">3</span>
+                        </button>
+                        <div class="h-4 w-[1px] bg-white/[0.08]"></div>
+                        <button class="flex items-center gap-2 bg-panel border border-white/[0.08] hover:border-white/[0.15] text-text-secondary hover:text-white px-3 py-1.5 rounded-md text-sm transition-all shadow-sm">
+                            Sort: <span class="text-white font-medium">Spend Velocity</span> <i class="ph ph-caret-down text-text-faint"></i>
+                        </button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                <!-- RESPONSIVE AD GRID -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-12">
 
-                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 1;">
-                        <div class="px-3 py-2.5 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
-                            <div class="flex items-center gap-2 min-w-0"><div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0"><span class="text-[10px] font-bold text-white">V</span></div><span class="text-sm font-bold text-white truncate">VaultX</span></div>
-                            <div class="flex items-center gap-1.5 shrink-0"><div class="w-1.5 h-1.5 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div><span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span></div>
+                    <!-- CARD 1: Proven Winner -->
+                    <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card hover:shadow-card-hover transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/[0.12] flex flex-col group opacity-0 animate-fade-in-up stagger-1 gpu-accelerated overflow-hidden">
+                        
+                        <!-- Header -->
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04]">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-white">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759] shadow-[0_0_5px_rgba(52,199,89,0.5)]"></span>
                         </div>
-                        <div class="p-3 bg-[#040914]/40 grow flex flex-col relative">
-                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-2 mb-2">Stop losing 40% of your B2B leads to complex security checks. Our new 1-click SSO integration secures endpoints cleanly.</p>
-                            <button class="text-[11px] font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+
+                        <!-- Content wrapper -->
+                        <div class="p-4 flex flex-col gap-4 flex-1">
+                            <!-- Copy -->
+                            <p class="text-sm text-text-secondary line-clamp-2 leading-relaxed">Stop managing passwords and start managing access. Okta secures your workforce in minutes, not months. Try our new contextual IAM solution.</p>
+                            
+                            <!-- Media Thumbnail -->
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] group-hover:border-white/10 transition-colors">
+                                <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80" alt="Dashboard showing security metrics" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity hover:mix-blend-normal">
+                                <!-- Play Button overlay -->
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:bg-brand-blue/80 group-hover:border-white/40 transition-all duration-300">
+                                        <i class="ph-fill ph-play ml-1"></i>
+                                    </div>
+                                </div>
+                                <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded tracking-wide font-medium">0:15</div>
+                            </div>
+
+                            <!-- Chips -->
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[#34C759]/10 text-[#34C759] border border-[#34C759]/20">Proven Winner</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/[0.05] text-text-secondary border border-white/[0.05]">UGC Style</span>
+                            </div>
+
+                            <!-- Meta -->
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-facebook-logo"></i> Meta Ads</div>
+                                <div><span class="text-text-secondary">Hook:</span> Problem/Agitate</div>
+                            </div>
                         </div>
-                        <div class="h-32 relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors shrink-0">
-                            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=500&q=80" alt="Dashboard UI" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-60 mix-blend-luminosity">
-                            <div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"><div class="w-8 h-8 bg-[#0A192F]/80 backdrop-blur-sm border border-[#0033FF] flex items-center justify-center text-white transform group-hover/card:scale-110 transition-transform rounded-sm"><i class="ph ph-play text-base"></i></div></div>
-                            <div class="absolute bottom-1 right-1.5 z-10 bg-[#0A192F] px-1 py-[1px] rounded-[2px] text-[9px] text-white border border-[#D3D3D3]/20">0:45</div>
-                        </div>
-                        <div class="p-3 flex flex-col gap-2 bg-[#0A192F]">
-                            <div class="flex flex-wrap gap-1.5"><span class="tracker-badge badge-winner"><i class="ph ph-target"></i> Proven Asset</span><span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 45d</span></div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#A9A9A9] mt-1 uppercase tracking-wider overflow-hidden"><div><span class="text-[#D3D3D3] font-bold">FMT:</span> Video Reel</div><div class="w-px h-2.5 bg-[#D3D3D3]/20"></div><div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Efficiency</div></div>
-                        </div>
-                        <a href="#" class="border-t border-[#D3D3D3]/10 px-3 py-2.5 flex items-center justify-between text-[11px] font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">Inspect Creative <i class="ph ph-arrow-right"></i></a>
+
+                        <!-- Footer -->
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-secondary hover:text-white flex items-center justify-between transition-colors">
+                            Inspect Creative Lifecycle
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
                     </article>
 
-                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 2;">
-                        <div class="px-3 py-2.5 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
-                            <div class="flex items-center gap-2 min-w-0"><div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0"><span class="text-[10px] font-bold text-white">V</span></div><span class="text-sm font-bold text-white truncate">VaultX</span></div>
-                            <div class="flex items-center gap-1.5 shrink-0"><div class="w-1.5 h-1.5 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div><span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span></div>
+                    <!-- CARD 2: Scaling -->
+                    <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card hover:shadow-card-hover transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/[0.12] flex flex-col group opacity-0 animate-fade-in-up stagger-2 gpu-accelerated overflow-hidden">
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04]">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-white">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
                         </div>
-                        <div class="p-3 bg-[#040914]/40 grow flex flex-col relative">
-                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-2 mb-2">Data leaks don't happen in the boardroom. Discover the architecture that quarantines malicious traffic in milliseconds.</p>
-                            <button class="text-[11px] font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+                        <div class="p-4 flex flex-col gap-4 flex-1">
+                            <p class="text-sm text-text-secondary line-clamp-2 leading-relaxed">Zero-trust architecture is no longer optional. See how Okta integrates with your entire stack to secure every endpoint automatically.</p>
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] group-hover:border-white/10 transition-colors">
+                                <img src="https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?auto=format&fit=crop&w=400&q=80" alt="Abstract connection points" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity hover:mix-blend-normal object-center">
+                            </div>
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[#FF9F0A]/10 text-[#FF9F0A] border border-[#FF9F0A]/20">Scaling Rapidly</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/[0.05] text-text-secondary border border-white/[0.05]">Static Image</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-linkedin-logo"></i> LinkedIn</div>
+                                <div><span class="text-text-secondary">Hook:</span> Fear/Urgency</div>
+                            </div>
                         </div>
-                        <div class="h-32 relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors shrink-0">
-                            <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=500&q=80" alt="Code Graph" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-50 grayscale">
-                            <div class="absolute inset-0 p-3 flex flex-col justify-center items-center text-center z-10 pointer-events-none"><h3 class="text-lg font-bold text-white leading-tight">Zero Trust.<br>Zero Friction.</h3><div class="w-6 h-1 bg-[#0033FF] mt-2"></div></div>
-                        </div>
-                        <div class="p-3 flex flex-col gap-2 bg-[#0A192F]">
-                            <div class="flex flex-wrap gap-1.5"><span class="tracker-badge badge-scaling"><i class="ph ph-trend-up"></i> Scaling Output</span><span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 12d</span></div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#A9A9A9] mt-1 uppercase tracking-wider overflow-hidden"><div><span class="text-[#D3D3D3] font-bold">FMT:</span> Static Graphic</div><div class="w-px h-2.5 bg-[#D3D3D3]/20"></div><div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Logic</div></div>
-                        </div>
-                        <a href="#" class="border-t border-[#D3D3D3]/10 px-3 py-2.5 flex items-center justify-between text-[11px] font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">Inspect Creative <i class="ph ph-arrow-right"></i></a>
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-secondary hover:text-white flex items-center justify-between transition-colors">
+                            Inspect Creative Lifecycle
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
                     </article>
 
-                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 3;">
-                        <div class="px-3 py-2.5 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
-                            <div class="flex items-center gap-2 min-w-0"><div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0"><span class="text-[10px] font-bold text-white">V</span></div><span class="text-sm font-bold text-white truncate">VaultX</span></div>
-                            <div class="flex items-center gap-1.5 shrink-0"><div class="w-1.5 h-1.5 bg-[#0033FF] rounded-none animate-pulse shadow-[0_0_8px_rgba(0,51,255,0.8)]"></div><span class="text-[9px] font-bold text-[#0033FF] uppercase tracking-widest">Active</span></div>
+                    <!-- CARD 3: High Velocity -->
+                    <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card hover:shadow-card-hover transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/[0.12] flex flex-col group opacity-0 animate-fade-in-up stagger-3 gpu-accelerated overflow-hidden">
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04]">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-white">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
                         </div>
-                        <div class="p-3 bg-[#040914]/40 grow flex flex-col relative">
-                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-2 mb-2">UGC style: "I'm the CISO for a Fortune 500 and here are the 3 tools I actually use." VaultX replaces 4 different systems...</p>
-                            <button class="text-[11px] font-bold text-[#0033FF] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">Read Full Text</button>
+                        <div class="p-4 flex flex-col gap-4 flex-1">
+                            <p class="text-sm text-text-secondary line-clamp-2 leading-relaxed">"We cut our IT deployment time by 80%." Hear how Acme Corp scaled their workforce with Okta's seamless identity management integration.</p>
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] group-hover:border-white/10 transition-colors">
+                                <img src="https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&w=400&q=80" alt="Professional interview setup" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity hover:mix-blend-normal">
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:bg-brand-blue/80 group-hover:border-white/40 transition-all duration-300">
+                                        <i class="ph-fill ph-play ml-1"></i>
+                                    </div>
+                                </div>
+                                <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded tracking-wide font-medium">0:32</div>
+                            </div>
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-blue/10 text-brand-blue border border-brand-blue/20">High Velocity</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/[0.05] text-text-secondary border border-white/[0.05]">Testimonial</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-facebook-logo"></i> Meta Ads</div>
+                                <div><span class="text-text-secondary">Hook:</span> Social Proof</div>
+                            </div>
                         </div>
-                        <div class="h-32 relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 img-tint flex items-center justify-center group-hover/card:border-[#0033FF]/30 transition-colors shrink-0">
-                            <img src="https://images.unsplash.com/photo-1555702581-8153ce1fbba5?auto=format&fit=crop&w=500&q=80" alt="Person" class="w-full h-full object-cover transform group-hover/card:scale-105 transition-transform duration-700 ease-out opacity-60 grayscale">
-                            <div class="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"><div class="w-8 h-8 bg-[#0033FF] flex items-center justify-center text-white transform group-hover/card:scale-110 transition-transform rounded-sm shadow-[0_0_15px_rgba(0,51,255,0.5)]"><i class="ph ph-play text-base"></i></div></div>
-                            <div class="absolute bottom-1 right-1.5 z-10 bg-[#0A192F] px-1 py-[1px] rounded-[2px] text-[9px] text-white border border-[#D3D3D3]/20">1:12</div>
-                        </div>
-                        <div class="p-3 flex flex-col gap-2 bg-[#0A192F]">
-                            <div class="flex flex-wrap gap-1.5"><span class="tracker-badge badge-velocity"><i class="ph ph-rocket-launch"></i> High Velocity</span><span class="tracker-badge badge-neutral"><i class="ph ph-clock"></i> 3d</span></div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#A9A9A9] mt-1 uppercase tracking-wider overflow-hidden"><div><span class="text-[#D3D3D3] font-bold">FMT:</span> UGC Reel</div><div class="w-px h-2.5 bg-[#D3D3D3]/20"></div><div><span class="text-[#D3D3D3] font-bold">HOOK:</span> Authority</div></div>
-                        </div>
-                        <a href="#" class="border-t border-[#D3D3D3]/10 px-3 py-2.5 flex items-center justify-between text-[11px] font-bold text-[#A9A9A9] hover:text-[#0033FF] hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">Inspect Creative <i class="ph ph-arrow-right"></i></a>
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-secondary hover:text-white flex items-center justify-between transition-colors">
+                            Inspect Creative Lifecycle
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
                     </article>
 
-                    <article class="data-panel rounded flex flex-col group/card animate-cascade w-full" style="--idx: 4;">
-                        <div class="px-3 py-2.5 border-b border-[#D3D3D3]/10 flex items-center justify-between bg-[#0A192F]">
-                            <div class="flex items-center gap-2 min-w-0"><div class="w-5 h-5 rounded-sm bg-[#040914] border border-[#D3D3D3]/20 flex items-center justify-center shrink-0"><span class="text-[10px] font-bold text-white">V</span></div><span class="text-sm font-bold text-white truncate">VaultX</span></div>
-                            <div class="flex items-center gap-1.5 shrink-0"><div class="w-1.5 h-1.5 bg-[#A9A9A9] rounded-none"></div><span class="text-[9px] font-bold text-[#A9A9A9] uppercase tracking-widest">Paused</span></div>
+                    <!-- CARD 4: Fatigued -->
+                    <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card flex flex-col group opacity-0 animate-fade-in-up stagger-4 transition-all duration-300 overflow-hidden relative">
+                        <!-- Dimmer overlay for fatigued state -->
+                        <div class="absolute inset-0 bg-canvas/40 pointer-events-none z-10"></div>
+                        
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04] relative z-20">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0 opacity-60">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-text-secondary">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-text-faint"></span>
                         </div>
-                        <div class="p-3 bg-[#040914]/40 grow flex flex-col relative">
-                            <p class="text-sm text-[#D3D3D3] leading-relaxed line-clamp-2 mb-2">Carousel detailing the 5 stages of SOC2 compliance and how our automated engine cuts integration time by 80%.</p>
-                            <button class="text-[11px] font-bold text-[#A9A9A9] hover:text-white self-start transition-colors uppercase tracking-wider mt-auto">View Variant History</button>
+                        <div class="p-4 flex flex-col gap-4 flex-1 relative z-20">
+                            <p class="text-sm text-text-faint line-clamp-2 leading-relaxed">Secure your remote workforce today. Download our free guide to Identity and Access Management in 2024.</p>
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] grayscale">
+                                <img src="https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&w=400&q=80" alt="Code on screen" class="w-full h-full object-cover opacity-50">
+                            </div>
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">Fatigued (Off)</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-linkedin-logo"></i> LinkedIn</div>
+                                <div><span class="text-text-faint">Hook:</span> Lead Gen</div>
+                            </div>
                         </div>
-                        <div class="h-32 relative overflow-hidden bg-[#040914] border-y border-[#D3D3D3]/10 flex items-center justify-center transition-colors shrink-0">
-                            <div class="w-full h-full flex gap-1 px-1 py-1.5 opacity-40 grayscale group-hover/card:grayscale-0 transition-all duration-500"><div class="flex-1 bg-[#285BFF] rounded-sm transform scale-95 group-hover/card:scale-100 transition-transform origin-left"></div><div class="flex-1 border border-[#D3D3D3]/30 rounded-sm bg-[#040914]"></div><div class="flex-1 border border-[#D3D3D3]/30 rounded-sm bg-[#040914]"></div></div>
-                            <div class="absolute bottom-1.5 right-1.5 z-10 bg-[#0A192F] px-1.5 py-[1px] rounded-[2px] text-[9px] text-[#A9A9A9] border border-[#D3D3D3]/20 flex items-center gap-1"><i class="ph ph-cards"></i> 5 Slides</div>
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-faint hover:text-text-secondary flex items-center justify-between transition-colors relative z-20">
+                            View Historical Data
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
+                    </article>
+                    
+                    <!-- DUMMY CARDS TO SHOW DENSITY (Staggered Animation setup) -->
+                    <!-- CARD 5 -->
+                     <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card hover:shadow-card-hover transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/[0.12] flex flex-col group opacity-0 animate-fade-in-up stagger-5 gpu-accelerated overflow-hidden">
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04]">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-white">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
                         </div>
-                        <div class="p-3 flex flex-col gap-2 bg-[#0A192F]">
-                            <div class="flex flex-wrap gap-1.5"><span class="tracker-badge badge-neutral opacity-50"><i class="ph ph-x-circle"></i> Inactive</span><span class="tracker-badge badge-neutral"><i class="ph ph-chart-line-down"></i> Fatigue</span></div>
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#555] mt-1 uppercase tracking-wider overflow-hidden"><div><span class="text-[#A9A9A9] font-bold">FMT:</span> Carousel</div><div class="w-px h-2.5 bg-[#D3D3D3]/10"></div><div><span class="text-[#A9A9A9] font-bold">HOOK:</span> Education</div></div>
+                        <div class="p-4 flex flex-col gap-4 flex-1">
+                            <p class="text-sm text-text-secondary line-clamp-2 leading-relaxed">Don't let legacy systems hold back your growth. Modernize your IAM framework with Okta Identity Engine.</p>
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] group-hover:border-white/10 transition-colors">
+                                <img src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=400&q=80" alt="Server room abstraction" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity hover:mix-blend-normal">
+                            </div>
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-white/[0.05] text-text-primary border border-white/[0.08]">Testing Phase</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-facebook-logo"></i> Meta Ads</div>
+                                <div><span class="text-text-secondary">Hook:</span> Product Demo</div>
+                            </div>
                         </div>
-                        <a href="#" class="border-t border-[#D3D3D3]/10 px-3 py-2.5 flex items-center justify-between text-[11px] font-bold text-[#A9A9A9] hover:text-white hover:bg-[#040914]/20 transition-all uppercase tracking-widest mt-auto">Replay Analytics <i class="ph ph-arrow-right"></i></a>
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-secondary hover:text-white flex items-center justify-between transition-colors">
+                            Inspect Creative Lifecycle
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
                     </article>
 
-                </div>
+                    <!-- CARD 6 -->
+                    <article class="bg-gradient-to-b from-raised to-panel border border-white/[0.06] rounded-xl shadow-card hover:shadow-card-hover transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/[0.12] flex flex-col group opacity-0 animate-fade-in-up stagger-6 gpu-accelerated overflow-hidden">
+                        <div class="p-4 flex items-center justify-between border-b border-white/[0.04]">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-7 h-7 rounded bg-white p-0.5 flex items-center justify-center shrink-0">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-black"><path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="currentColor"/><path d="M15 9H9V15H15V9Z" fill="white"/></svg>
+                                </div>
+                                <span class="text-sm font-medium text-white">Okta</span>
+                            </div>
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
+                        </div>
+                        <div class="p-4 flex flex-col gap-4 flex-1">
+                            <p class="text-sm text-text-secondary line-clamp-2 leading-relaxed">Join 15,000+ organizations trusting Okta to connect their people and technology securely.</p>
+                            <div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-canvas border border-white/[0.04] group-hover:border-white/10 transition-colors">
+                                <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=400&q=80" alt="Team meeting" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 mix-blend-luminosity hover:mix-blend-normal">
+                                 <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:bg-brand-blue/80 group-hover:border-white/40 transition-all duration-300">
+                                        <i class="ph-fill ph-play ml-1"></i>
+                                    </div>
+                                </div>
+                                <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded tracking-wide font-medium">1:04</div>
+                            </div>
+                            <div class="flex gap-2 flex-wrap mt-auto">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[#34C759]/10 text-[#34C759] border border-[#34C759]/20">Proven Winner</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-text-faint font-medium tracking-wide">
+                                <div class="flex items-center gap-1.5"><i class="ph ph-linkedin-logo"></i> LinkedIn</div>
+                                <div><span class="text-text-secondary">Hook:</span> Authority</div>
+                            </div>
+                        </div>
+                        <button class="w-full py-3 px-4 border-t border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] text-xs font-medium text-text-secondary hover:text-white flex items-center justify-between transition-colors">
+                            Inspect Creative Lifecycle
+                            <i class="ph ph-arrow-right"></i>
+                        </button>
+                    </article>
 
-                <div class="w-full py-16 flex flex-col justify-center items-center gap-4">
-                    <div class="flex gap-2"><div class="w-1 h-5 bg-[#A9A9A9] animate-pulse rounded-sm" style="animation-delay: 0ms"></div><div class="w-1 h-5 bg-[#D3D3D3] animate-pulse rounded-sm" style="animation-delay: 150ms"></div><div class="w-1 h-5 bg-[#0033FF] animate-pulse rounded-sm shadow-[0_0_10px_rgba(0,51,255,0.6)]" style="animation-delay: 300ms"></div></div>
-                    <span class="text-[9px] uppercase tracking-widest text-[#A9A9A9] font-bold">Parsing Further Network Data</span>
                 </div>
             </div>
         </main>
