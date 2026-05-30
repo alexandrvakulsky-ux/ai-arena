@@ -48,6 +48,8 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 
 **GATE:** if you're about to call generate/refine with a from-imagination prompt and no reference/url/image attached, STOP and complete step 1–2 first.
 
+**FULL-TEMPLATE RULE:** every design change goes through AIDesigner regenerating/refining the **complete template**. Fetch the whole HTML (`aidesigner-fetch.js canvas <id>`) and port it *whole*. NEVER hand-edit the design HTML, apply partial diffs, or "token-swap" the real app — that's the half-assed shortcut that got called out. The design always comes from AIDesigner, in full.
+
 ### 1. Design — AIDesigner MCP
 - `whoami` / `get_credit_status` first. Brand kit **"Ad Spy"** = `3ba50f7f-aa3a-4b85-9bea-de0986dd60d7` (DM Sans, #0033FF on #0A192F navy, spiral mark). Editor session `5ee32805-c5f3-4c9f-a876-535c49ec9dfb`.
 - `refine_design(run_id, feedback, brand_kit_id=…)` — pass **no** `target_canvas_id` to get a NEW canvas (before/after sits side-by-side in the editor); pass it to overwrite in place.
@@ -65,10 +67,17 @@ Present them; `/tasks` returns only OPEN tasks (closed ones drop off). Each task
 For each comment → `refine_design(...)` → `aidesigner-fetch.js latest …` → `publish-staging.sh`. Optionally
 `adspy-design-compare.sh` for a before/after report. **STOP** and show the staging URL — let the human review.
 
-### 5. Ship (human-gated)
-Production is a **token reskin** of the REAL app, never the mockup:
-- Reskin recipe (ad-spy is CSS-var driven): swap font (`<link>` + `--font` → DM Sans), retheme the `:root` token block (navy bg/surfaces, `--accent:#0033FF`), add the blue spiral `<svg>` in `.sidebar-header`. **Nothing else** — JS/gate/`/api`/markup untouched.
-- Deploy: `bash scripts/adspy-deploy-reskin.sh <reskinned-real-index.html>` (backs up to `/workspace/.deploy-backups/`, verifies live 200 + marker, auto-rolls-back on failure). Revert: `--rollback`.
+### 5. Ship (human-gated) — port AIDesigner's FULL template, faithfully
+Production must reflect AIDesigner's **complete** approved template — NOT a lazy `:root`
+token swap (that was the half-assed mistake). Port the full design (markup structure + CSS +
+components) onto the real app, rewiring the working pieces back in: the `#gate` + `checkPw`,
+the `/api/*` fetches, the dynamic competitor/ad-card rendering, and any JS hooks (ids/classes
+the JS targets). Keep functionality, adopt the design wholesale.
+- Build the production `index.html` = AIDesigner's full template with the real app's JS/data
+  wiring grafted in. Verify it renders WITH real data (login + `/api`) before shipping.
+- Deploy: `bash scripts/adspy-deploy-reskin.sh <built-real-index.html>` (out-of-tree backup,
+  verifies live 200 + marker, auto-rollback). Revert: `--rollback`. (The script name is legacy;
+  it deploys whatever real index.html you pass — feed it the full-template port, not a token swap.)
 - Then close the addressed Webvizio task: `bash scripts/wv.sh close <uuid>` — **only after the human approves** (closing is an external write).
 
 ## Hard constraints (verified)
