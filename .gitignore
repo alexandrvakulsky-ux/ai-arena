@@ -15,3 +15,8 @@ agents/scout-bot/resolutions.jsonl
 agents/scout-bot/sources.json
 .aidesigner/*
 !.aidesigner/.gitkeep
+public/*redesign*.html
+public/aidesigner-*.html
+public/compare/
+.deploy-backups/
+.claude/designs/
