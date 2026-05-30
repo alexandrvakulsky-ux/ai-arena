@@ -7,8 +7,11 @@
  * reachable). Auth reuses the headersHelper that already mints/caches tokens.
  *
  *   node aidesigner-fetch.js list                 # newest-first canvases (JSON)
- *   node aidesigner-fetch.js canvas <id> <out.html>
- *   node aidesigner-fetch.js latest <out.html>    # newest design/ui canvas
+ *   node aidesigner-fetch.js canvas <id> <out.html>   # PREFER THIS — pass the id
+ *       returned by generate_design/refine_design (reliable).
+ *   node aidesigner-fetch.js latest <out.html>        # best-effort: most-recently
+ *       UPDATED canvas. NOTE get_canvas bumps updated_at, so this can mis-pick
+ *       after a read — use `canvas <id>` whenever you have the id.
  *
  * Prints one-line JSON {ok,...}. Exits non-zero on any failure / bad HTML.
  */
@@ -99,9 +102,10 @@ async function main() {
       outPath = a1;
       const text = await callTool('list_canvases', {});
       let list; try { list = JSON.parse(text).canvases || []; } catch { list = []; }
-      const design = list.filter((c) => c.kind === 'design' || c.kind === 'ui');
+      const design = list.filter((c) => c.kind === 'design' || c.kind === 'ui')
+        .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
       if (!design.length) fail('no design/ui canvases found');
-      canvasId = design[0].id; // list_canvases is newest-first
+      canvasId = design[0].id; // newest by updated_at (ISO strings sort lexically)
     }
     if (!canvasId || !outPath) fail('usage: canvas <id> <out.html>  |  latest <out.html>');
     const text = await callTool('get_canvas', { canvas_id: canvasId });
