@@ -20,6 +20,7 @@ start_children() {
   pkill -f "node /workspace/server.js" 2>/dev/null
   pkill -f "^node server.js" 2>/dev/null
   pkill -f "agents/scout-bot/bot.js" 2>/dev/null
+  pkill -f "sb-sync-loop" 2>/dev/null
   sleep 2
   nohup node /workspace/server.js >> /workspace/server.log 2>&1 &
   disown
@@ -27,6 +28,11 @@ start_children() {
   # spawn is safe — costs nothing if disabled.
   if [ -f /workspace/agents/scout-bot/bot.js ]; then
     nohup node /workspace/agents/scout-bot/bot.js >> /workspace/scout-bot.log 2>&1 &
+    disown
+  fi
+  # second_brain repo auto-sync — push bot source + brain snapshot every 30 min.
+  if [ -f /workspace/scripts/sync-second-brain.sh ]; then
+    nohup bash -c 'while true; do bash /workspace/scripts/sync-second-brain.sh; sleep 1800; done' sb-sync-loop >> /workspace/sync-second-brain.log 2>&1 &
     disown
   fi
 }
