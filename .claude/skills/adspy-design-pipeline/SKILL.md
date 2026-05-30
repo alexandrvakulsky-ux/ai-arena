@@ -33,6 +33,21 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 
 ## Stage-by-stage
 
+### 0. Reference intake — MANDATORY, do this FIRST, every single time
+**HARD RULE: never write a design prompt from imagination when a reference exists — and here one ALWAYS exists.** Do not hand-fabricate designs or hand-edit CSS and call it done. Gather the references and feed them *into* AIDesigner.
+
+1. **Collect every available reference up front:**
+   - The **current app** (what you're improving): `bash scripts/adspy-live-shot.sh before` → logged-in screenshot.
+   - The **latest design**: the staging URL / the last canvas id from generate/refine.
+   - **Direction / inspiration**: competitor or example URLs. If you don't have a clear target, GET it — ask Alex for the reference/examples, or ask AIDesigner to generate options (`generate_branding_kit_variations`, multiple `generate_design` directions). **Missing info → gather it; never guess.**
+2. **Feed references INTO AIDesigner** (don't just describe them):
+   - Website/app reachable by URL → `generate_design`/`refine_design` with `mode: clone | enhance | inspire` + `url:` (AIDesigner has internet; the gh-pages staging URL works; the public ad-spy host `:3001` works but is password-gated so it'll see the gate).
+   - Brand from a site → `create_brand_kit_from_url`.
+   - Screenshots/examples → host them on gh-pages and pass as `url:`, or pass reference `image_urls` to the image tools.
+3. **Only then** generate — with the reference attached AND a complete, specific brief (layout, explicit palette/contrast rules, do/don't, the exact fixes requested).
+
+**GATE:** if you're about to call generate/refine with a from-imagination prompt and no reference/url/image attached, STOP and complete step 1–2 first.
+
 ### 1. Design — AIDesigner MCP
 - `whoami` / `get_credit_status` first. Brand kit **"Ad Spy"** = `3ba50f7f-aa3a-4b85-9bea-de0986dd60d7` (DM Sans, #0033FF on #0A192F navy, spiral mark). Editor session `5ee32805-c5f3-4c9f-a876-535c49ec9dfb`.
 - `refine_design(run_id, feedback, brand_kit_id=…)` — pass **no** `target_canvas_id` to get a NEW canvas (before/after sits side-by-side in the editor); pass it to overwrite in place.
