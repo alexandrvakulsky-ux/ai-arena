@@ -5,8 +5,13 @@ description: "Use this skill for the ad-spy frontend design workflow: generate/r
 
 # Ad-Spy Design Pipeline (optimized)
 
+> **READ FIRST — the rulebook:** [`DESIGN-PLAYBOOK.md`](./DESIGN-PLAYBOOK.md) is the single source
+> of truth for HOW we design (the senior-designer method, naming/organization conventions, and craft
+> principles). This file (SKILL.md) is the *mechanics* — the commands/tooling that execute the
+> playbook. When they seem to conflict, the playbook wins. Work the phases in the playbook, in order.
+
 A real comment→rework→ship loop. AIDesigner makes the design, GitHub Pages hosts it,
-Webvizio is the shared comment surface, and the look ships to production as a token reskin.
+Webvizio is the shared comment surface, and the look ships to production as a faithful full-template port.
 
 ## The loop (one pass)
 ```
