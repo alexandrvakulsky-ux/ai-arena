@@ -23,7 +23,7 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 ## Helper scripts (in /workspace/scripts) — use these, don't hand-roll
 | Script | Runs in | Purpose |
 |---|---|---|
-| `aidesigner-fetch.js <list\|canvas <id>\|latest> <out.html>` | ai-arena | Pull canvas HTML **straight from api.aidesigner.ai to a file**. NEVER hand-write/Write canvas HTML — it's the #1 token sink. |
+| `aidesigner.js <gen\|refine\|canvas\|latest\|list\|credits>` | ai-arena | The AIDesigner CLI. **Drives generate/refine/get_canvas over the API so design HTML goes straight to a FILE, never into context** — returns only `{run_id,canvas_id,file}`. Editor delivery still works. USE THIS for gen/refine/fetch, NOT the MCP generate_design/refine_design (those dump ~600 lines of HTML into context). NEVER hand-write canvas HTML. |
 | `wv.sh <tasks\|task\|prompt\|shot\|close\|pull> …` | ai-arena → ad-spy | Webvizio relay (the MCP is dead here — see constraints). `wv.sh pull <dir>` fetches open tasks + prompts + screenshots. |
 | `publish-staging.sh <local.html>` | ai-arena | Idempotent, verified publish to the gh-pages staging URL (polls until the live page matches). |
 | `adspy-deploy-reskin.sh <reskinned.html> [--marker=STR] \| --rollback` | ai-arena | Safe prod deploy: out-of-tree backup, atomic swap, 200+marker verify, auto-rollback. Refuses mockups. |
@@ -48,12 +48,14 @@ refine in AIDesigner ──▶ aidesigner-fetch (HTML→file) ──▶ publish-
 
 **GATE:** if you're about to call generate/refine with a from-imagination prompt and no reference/url/image attached, STOP and complete step 1–2 first.
 
-**FULL-TEMPLATE RULE:** every design change goes through AIDesigner regenerating/refining the **complete template**. Fetch the whole HTML (`aidesigner-fetch.js canvas <id>`) and port it *whole*. NEVER hand-edit the design HTML, apply partial diffs, or "token-swap" the real app — that's the half-assed shortcut that got called out. The design always comes from AIDesigner, in full.
+**FULL-TEMPLATE RULE:** every design change goes through AIDesigner regenerating/refining the **complete template**. Fetch the whole HTML (`aidesigner.js canvas <id> <out>` or via `gen`/`refine` which write the file directly) and port it *whole*. NEVER hand-edit the design HTML, apply partial diffs, or "token-swap" the real app — that's the half-assed shortcut that got called out. The design always comes from AIDesigner, in full.
 
-### 1. Design — AIDesigner MCP
-- `whoami` / `get_credit_status` first. Brand kit **"Ad Spy"** = `3ba50f7f-aa3a-4b85-9bea-de0986dd60d7` (DM Sans, #0033FF on #0A192F navy, spiral mark). Editor session `5ee32805-c5f3-4c9f-a876-535c49ec9dfb`.
-- `refine_design(run_id, feedback, brand_kit_id=…)` — pass **no** `target_canvas_id` to get a NEW canvas (before/after sits side-by-side in the editor); pass it to overwrite in place.
-- **Then fetch, don't transcribe:** `node scripts/aidesigner-fetch.js latest /workspace/.claude/designs/current/design.html`.
+### 1. Design — via the `aidesigner.js` CLI (HTML never enters context)
+- Check creds: `node scripts/aidesigner.js credits`. Brand kit **"Ad Spy"** = `3ba50f7f-aa3a-4b85-9bea-de0986dd60d7` (DM Sans, navy, spiral). Editor session `5ee32805-c5f3-4c9f-a876-535c49ec9dfb`. (MCP `whoami`/editor-session/brand-kit tools are fine — they're low-token; only generate/refine/get_canvas must go through the CLI.)
+- **Generate:** write the prompt to a file, then
+  `node scripts/aidesigner.js gen /workspace/.claude/designs/current/design.html --prompt-file=/tmp/p.txt [--repo-file=/tmp/r.txt] [--brand=3ba50f7f-…] [--viewport=desktop] [--mode=clone|enhance|inspire --url=REF]` → returns `{run_id, canvas_id, file}` only; HTML is in the file + the editor canvas.
+- **Refine:** `node scripts/aidesigner.js refine <out.html> --run=<run_id> --feedback-file=/tmp/fb.txt [--brand=…] [--target=<canvas_id>]`. Omit `--target` for a NEW canvas (before/after in the editor); pass it to overwrite in place.
+- Per Stage 0: attach references (`--mode`+`--url`, brand kit, or `image_urls`) — don't prompt from imagination.
 
 ### 2. Publish to staging
 `bash scripts/publish-staging.sh /workspace/.claude/designs/current/design.html` → live at
@@ -73,8 +75,13 @@ token swap (that was the half-assed mistake). Port the full design (markup struc
 components) onto the real app, rewiring the working pieces back in: the `#gate` + `checkPw`,
 the `/api/*` fetches, the dynamic competitor/ad-card rendering, and any JS hooks (ids/classes
 the JS targets). Keep functionality, adopt the design wholesale.
-- Build the production `index.html` = AIDesigner's full template with the real app's JS/data
-  wiring grafted in. Verify it renders WITH real data (login + `/api`) before shipping.
+- **Proven method** (ad-spy is a no-build SPA — don't import Tailwind or the mockup markup into
+  prod): reproduce AIDesigner's full design system as **static CSS mapped onto the app's existing
+  class names** (.ad-card, .card-head, .fb-img, .tab, .stats-total, .sidebar, .gate-box, …) and
+  splice it in place of the app's `<style>` block, keeping all markup + JS. Pull current prod
+  index.html, author the CSS to match AIDesigner's canvas, splice between `<style>`…`</style>`.
+- Verify it renders WITH real data (login + `/api`) before shipping — `adspy-shoot.js` against a
+  temp `public/__ported.html` with `login:true`.
 - Deploy: `bash scripts/adspy-deploy-reskin.sh <built-real-index.html>` (out-of-tree backup,
   verifies live 200 + marker, auto-rollback). Revert: `--rollback`. (The script name is legacy;
   it deploys whatever real index.html you pass — feed it the full-template port, not a token swap.)
