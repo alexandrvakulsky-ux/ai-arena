@@ -32,14 +32,22 @@ const fetch = require('node-fetch');
 // in this same container so localhost works.
 const ADSPY_BASE = 'http://172.17.0.1:3001';
 const AIARENA_BASE = 'http://localhost:3000';
+const ADSPY_PASSWORD = process.env.ADSPY_PASSWORD || ''; // ad-spy APP_PASSWORD, for x-app-token auth
+let adspyToken = null; // cached session token (ad-spy rotates it on restart → we re-auth on 401)
+const vectorstore = require('./vectorstore'); // semantic search over the second-brain
+const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY || ''; // web scraping (api.firecrawl.dev allowlisted in firewall)
 
 // ── Tool schemas (Anthropic format) ─────────────────────────────────────
 const TOOL_SCHEMAS = [
   {
     name: 'query_adspy',
     description:
-      'GET a JSON endpoint on the ad-spy server. ' +
-      'Use to answer questions about competitive ad data: "/health" for ad/competitor counts, "/api/sc-cost" for SC credit usage, etc. ' +
+      'GET a JSON endpoint on the ad-spy server. ONLY these paths exist — do NOT guess others. ' +
+      'Open (no auth): /health (ad/competitor counts). ' +
+      'Auth-required (the bot may NOT have an ad-spy key yet → these can return 401): ' +
+      '/api/competitors, /api/ads, /api/ads/new, /api/brief/today, /api/sc-cost, /api/access-stats, ' +
+      '/api/completeness, /api/clusters, /api/discover. ' +
+      'If a call returns 401/403, the bot lacks ad-spy auth — tell the user that and STOP; do NOT try other paths. ' +
       'Path must start with /. Returns up to 10KB.',
     input_schema: {
       type: 'object',
@@ -189,6 +197,34 @@ const TOOL_SCHEMAS = [
       required: ['summary', 'plan'],
     },
   },
+  {
+    name: 'vector_search',
+    description:
+      'Semantic search across the second-brain knowledge base — Slack channel history, meeting summaries (Fireflies), distilled DM context, and stored memories. ' +
+      'Use AUTOMATICALLY when the user asks about a past decision/meeting/discussion ("what did we decide about X", "what was said on the call"), ' +
+      'or when you need internal Futureproof/Genesis/team context. Returns top matches with relevance scores. Does NOT surface private 1:1 DMs.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural-language search query, e.g. "VAMP scaling problems" or "what Slava said about architecture"' },
+        limit: { type: 'integer', description: 'Max results, 1-10 (default 5)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'firecrawl_scrape',
+    description:
+      'Scrape a web page and return its main content as clean markdown (via Firecrawl). ' +
+      'Use to read competitor landing pages, articles, docs, or any URL the user references. Input: a full http(s) URL.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full URL starting with http:// or https://' },
+      },
+      required: ['url'],
+    },
+  },
 ];
 
 // ── Safety: read denylist ───────────────────────────────────────────────
@@ -238,7 +274,37 @@ async function httpGet(base, p) {
   }
 }
 
-async function execQueryAdspy({ path: p }) { return httpGet(ADSPY_BASE, p); }
+async function adspyAuth() {
+  if (!ADSPY_PASSWORD) { adspyToken = null; return null; }
+  try {
+    const r = await fetch(`${ADSPY_BASE}/api/auth`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: ADSPY_PASSWORD }),
+      timeout: 8000,
+    });
+    const d = await r.json();
+    adspyToken = (d && d.token) ? d.token : null;
+  } catch { adspyToken = null; }
+  return adspyToken;
+}
+async function adspyGet(p, token) {
+  const r = await fetch(`${ADSPY_BASE}${p}`, { headers: token ? { 'x-app-token': token } : {}, timeout: 8000 });
+  let text = await r.text();
+  if (text.length > 10000) text = text.slice(0, 10000) + `\n[... truncated; full length ${text.length} ...]`;
+  return { status: r.status, text };
+}
+async function execQueryAdspy({ path: p }) {
+  if (!p || typeof p !== 'string' || !p.startsWith('/')) return 'ERROR: path must start with /';
+  if (p.includes('..')) return 'ERROR: path traversal not allowed';
+  try {
+    if (!adspyToken) await adspyAuth();
+    let res = await adspyGet(p, adspyToken);
+    if (res.status === 401) { await adspyAuth(); res = await adspyGet(p, adspyToken); } // token rotated → re-auth once
+    if (res.status === 401) return 'ERROR: ad-spy auth failed (ADSPY_PASSWORD missing/wrong). Tell the user the bot has no ad-spy access; do not guess other paths.';
+    return res.text || `(${res.status}, empty body)`;
+  } catch (e) { return `ERROR: ${e.message}`; }
+}
 async function execQueryAiarena({ path: p }) { return httpGet(AIARENA_BASE, p); }
 
 function execReadFile({ path: p }) {
@@ -465,12 +531,47 @@ function execGitHeadInfo() {
   }
 }
 
+// ── Semantic search over the second-brain (reuses vectorstore.js) ───────
+async function execVectorSearch({ query, limit }) {
+  if (!query || typeof query !== 'string') return 'ERROR: query required';
+  if (!vectorstore.enabled()) return 'ERROR: vector store disabled (no OPENAI_API_KEY)';
+  const n = Math.min(Math.max(parseInt(limit) || 5, 1), 10);
+  // No isOwner → shared content only; never surfaces private 1:1 DMs via this tool.
+  const hits = await vectorstore.recall(query, n, {});
+  if (!hits.length) return 'No relevant memories found.';
+  return hits.map((h) => `(${h.user || '?'}, score ${(h.score || 0).toFixed(2)}) ${h.content}`).join('\n\n');
+}
+
+// ── Web scraping via Firecrawl (api.firecrawl.dev allowlisted in firewall) ─
+async function execFirecrawlScrape({ url }) {
+  if (!url || !/^https?:\/\//.test(url)) return 'ERROR: url must start with http:// or https://';
+  if (!FIRECRAWL_KEY) return 'ERROR: FIRECRAWL_API_KEY not set';
+  try {
+    const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + FIRECRAWL_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true }),
+      timeout: 30000,
+    });
+    // 402 (out of credits) / 429 (rate limit) / 5xx can return non-JSON or HTML —
+    // surface the status instead of throwing into the generic catch.
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) return `ERROR: firecrawl HTTP ${r.status}${d && d.error ? ' ' + String(d.error).slice(0, 120) : ''}`;
+    if (!d.success) return `ERROR: firecrawl ${JSON.stringify(d.error || d).slice(0, 160)}`;
+    let md = (d.data && d.data.markdown) || '';
+    if (md.length > 8000) md = md.slice(0, 8000) + `\n[... truncated; full length ${md.length}]`;
+    return md || '(empty page)';
+  } catch (e) { return `ERROR: ${e.message}`; }
+}
+
 // ── Dispatcher ──────────────────────────────────────────────────────────
 async function executeTool(name, input) {
   try {
     switch (name) {
       case 'query_adspy': return await execQueryAdspy(input || {});
       case 'query_aiarena': return await execQueryAiarena(input || {});
+      case 'vector_search': return await execVectorSearch(input || {});
+      case 'firecrawl_scrape': return await execFirecrawlScrape(input || {});
       case 'read_file': return execReadFile(input || {});
       case 'list_directory': return execListDirectory(input || {});
       case 'tail_log': return execTailLog(input || {});

@@ -4,7 +4,8 @@
  * OpenAI embeddings via the REST API (node-fetch, OPENAI_API_KEY) + a JSONL store
  * + in-JS cosine recall. No native modules (deliberately not better-sqlite3) and
  * no build step — matches the bot's no-build philosophy. Shared across users;
- * every entry tagged with {user} so both Alex (CEO) and CMO (wife) recall everything.
+ * every entry tagged with {user}. Most memories are recallable by everyone, but
+ * owner-only sources (Slack DMs) are returned only when recall is called isOwner.
  */
 
 const fs = require('fs');
@@ -33,6 +34,13 @@ async function embed(text) {
   } catch (e) { console.error('[vectorstore] embed exception:', e.message); return null; }
 }
 
+// Strip unpaired UTF-16 surrogates (e.g. an emoji cut in half by slicing). A lone
+// surrogate makes the JSON body invalid and breaks the Anthropic API call
+// ("The request body is not valid JSON: no low surrogate in string").
+function clean(s) {
+  return String(s == null ? '' : s).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}
+
 // Store a memory. tags is free-form metadata; {user} attributes who said it.
 async function store(role, content, user, tags = {}) {
   if (!content || !content.trim()) return false;
@@ -41,7 +49,7 @@ async function store(role, content, user, tags = {}) {
   try {
     fs.mkdirSync(DIR, { recursive: true });
     fs.appendFileSync(STORE, JSON.stringify({
-      ts: new Date().toISOString(), user: user || 'unknown', role, content: content.slice(0, 4000),
+      ts: new Date().toISOString(), user: user || 'unknown', role, content: clean(content.slice(0, 4000)),
       tags, embedding,
     }) + '\n');
     return true;
@@ -49,27 +57,34 @@ async function store(role, content, user, tags = {}) {
 }
 
 function cosine(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return 0;
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
   return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
 }
 
-// Recall top-k semantically similar memories. Shared store — does NOT filter by user.
-async function recall(query, limit = 5) {
+// Sources visible ONLY to the owner (Slack DMs/group DMs — private to the installer).
+// Channel content (source 'slack') stays shared with the team.
+const OWNER_ONLY_SOURCES = new Set(['slack-dm']);
+
+// Recall top-k semantically similar memories. Shared store, but owner-only sources
+// (Slack DMs) are excluded unless opts.isOwner is true. Safe default: restricted.
+async function recall(query, limit = 5, opts = {}) {
   if (!OPENAI_KEY || !fs.existsSync(STORE)) return [];
   const q = await embed(query);
   if (!q) return [];
   let rows = [];
   try { rows = fs.readFileSync(STORE, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); }
   catch (e) { console.error('[vectorstore] read error:', e.message); return []; }
+  if (!opts.isOwner) rows = rows.filter((r) => !(r.tags && OWNER_ONLY_SOURCES.has(r.tags.source)));
   return rows
-    .map((r) => ({ ts: r.ts, user: r.user, role: r.role, content: r.content, score: cosine(q, r.embedding) }))
+    .map((r) => ({ ts: r.ts, user: r.user, role: r.role, content: clean(r.content), score: cosine(q, r.embedding) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .filter((r) => r.score > 0.25);
 }
 
-const RECALL_RE = /what did i (say|mention|tell|decide|think|ask)|when did (i|we)|remember when|did i (say|tell|mention)|what (did|have) we (say|said|discuss|decide)|recall|last time/i;
+const RECALL_RE = /\b(recall|remember|meeting|decided?|discuss)\b|what did (i|we)|when did (i|we)|last time|вирішил|обговор|домовил|пам'?ята|нагада|мітинг|зустріч|коли ми|що (ми|казав|було|вирішил|обговор|домовил|таке|це)|розкажи|розпов|хто так|решил|обсужда|договорил|помн|напомн|совещани|встреч|что (мы|говорил|было|решил|обсужда|такое|это)|кто так|расскажи|tell me about/i;
 function looksLikeRecall(text) { return RECALL_RE.test(text || ''); }
 
 module.exports = { enabled, embed, store, recall, looksLikeRecall };

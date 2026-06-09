@@ -24,3 +24,16 @@ agents/scout-bot/.authorized_users.json
 agents/scout-bot/memory/vectors.jsonl
 agents/scout-bot/bot.js.bak-*
 .second-brain-mirror/
+agents/scout-bot/slack-ingest.js
+agents/scout-bot/memory/slack-cursor.json
+agents/scout-bot/fireflies-ingest.js
+agents/scout-bot/memory/fireflies-cursor.json
+
+# Bot runtime memory — contains PII (names, Telegram IDs). Local-only.
+agents/scout-bot/memory.md
+# Internal session docs with Slack channel/DM IDs, employee names, security findings — never publish
+.claude/sessions/slack-app-approval-template.md
+.claude/sessions/slack-app-submit-steps.md
+.claude/sessions/slack-secondbrain-approval.md
+.claude/sessions/security-and-code-review.md
+.claude/sessions/cmo-access-setup.md

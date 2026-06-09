@@ -55,6 +55,11 @@
           {
             "type": "command",
             "command": "bash /workspace/scripts/save-session-loop.sh &>/dev/null &"
+          },
+          {
+            "type": "command",
+            "command": "bash /home/node/.claude/scripts/aidesigner-refresh.sh 2>/dev/null || true",
+            "statusMessage": "Refreshing aidesigner token..."
           }
         ]
       }

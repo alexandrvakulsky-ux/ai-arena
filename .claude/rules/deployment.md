@@ -1,5 +1,5 @@
 ---
-description: Git workflow, Railway deployment, and dev container operations for AI Arena.
+description: Git workflow, self-hosted Hetzner deployment, and dev container operations for AI Arena.
 ---
 
 ## Git workflow
@@ -8,8 +8,8 @@ description: Git workflow, Railway deployment, and dev container operations for 
 - Before any major change: `git tag checkpoint-<short-description>`
 - To roll back: `git log --oneline` to find the commit, `git revert <hash>` (never reset --hard)
 
-## Railway deployment
-- Auto-deploys from `main` branch on every push (configured in `railway.toml`)
+## Deployment (self-hosted on Hetzner)
+- auto-deploy.sh on the Hetzner container polls origin/main every 60s and restarts server.js on new commits (Railway retired 2026-05-26)
 - No manual deploy step needed — push = deploy
 - To check if deployed: `git log origin/main..HEAD --oneline` (empty = in sync)
 - Live URL is separate from localhost:3000 — always test locally first

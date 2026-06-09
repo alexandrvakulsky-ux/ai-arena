@@ -78,7 +78,7 @@ If the clone fails (no git, no network): tell Alex "I need access to https://git
 - Stack: vanilla Node.js + Express, vanilla JS frontend, no build step
 - Port: 3000 (host) / 3000 (container)
 - SSH: 2222 (host) → 22 (container)
-- Deploy: Railway auto-deploys from `main`
+- Deploy: self-hosted on Hetzner — auto-deploy.sh polls origin/main and restarts server.js (Railway retired 2026-05-26)
 - Dev: Docker devcontainer on Hetzner VPS, cwd `/workspace`
 - Full docs: `/workspace/.claude/CLAUDE.md`, `/workspace/.claude/CONTAINER-OPS.md`, `/workspace/docs/PROJECT-HISTORY.md`
 
@@ -111,7 +111,7 @@ If the clone fails (no git, no network): tell Alex "I need access to https://git
   - `ai-arena` — **public**. SSH deploy key at `/root/.ssh/github-deploy-key` and `/home/node/.claude/github-deploy-key`. Deploy keys are **repo-scoped** — they can ONLY push/pull ai-arena, not ad-spy.
   - `ad-spy` — **private**. Use the owner-scoped PAT: `grep -oE 'github_pat_[A-Za-z0-9_]+' /home/node/.claude/.git/config | head -1`. That PAT has admin on all of Alex's private repos.
   - `claude-sync` — **private**. Same PAT.
-- **Deploy**: Railway auto-deploys ai-arena from `main`. Ad-spy is **not** Railway-deployed; it runs on Hetzner only.
+- **Deploy**: self-hosted on Hetzner — `auto-deploy.sh` polls origin/main and restarts `server.js` (Railway retired 2026-05-26). Ad-spy also runs on Hetzner only.
 
 ## ROOT vs NODE — DON'T GET FOOLED
 When SSH'd as root into either container, libc-based tools (`id`, `whoami`, `sudo`) report `node` (uid 1000) because of `LD_PRELOAD=/root/.claude/remote/fakeid.so` set by the Claude Code Remote runtime. The kernel-side process IS uid 0 — verify with:
@@ -131,6 +131,17 @@ If `$USER=root` and `$HOME=/root` but `whoami=node`, you ARE root. Don't waste a
 - Document findings. Update session notes in `.claude/sessions/` after significant work.
 - Keep the container clean. Watch for zombie processes, stale files, resource leaks.
 
+## SESSION HANDOFFS — ALWAYS DO THIS
+**FORMAT RULE (mandatory): the new-session message is ONE copy-paste code block — lead the reply with it, ZERO prose before it. Inside = terse imperative steps + the exact thing to paste/run. No preamble, no explanation, no "blah blah". Alex pastes and goes. All detail goes in the handoff FILE, never in the message.**
+When work must continue in a NEW session (context heavy, restart needed, MCP re-auth, dropped token/connection, etc.):
+1. **Write a handoff file** under `/workspace/.claude/sessions/` (or the relevant project) with the EXACT resume recipe — absolute paths, exact tool calls + params, credit/cost notes, and what NOT to touch. Make it the newest file so cwd-based auto-read can pick it up.
+2. **ALWAYS hand Alex a copy-paste "first message"** for the new session that makes it INSTANTLY pick up the work. It MUST:
+   - Reference handoff/input files by **ABSOLUTE PATH** (works from any cwd).
+   - Contain the **full instruction to execute immediately** — not "read this and wait".
+   - **Never depend on Alex picking a folder / switching to `/workspace`.** He starts sessions as ROOT sitting in `~` (`/root`) and does NOT want folder gymnastics. Make everything work from `/root`.
+3. **Don't make him fight the UI.** If something must load regardless of cwd (e.g. an MCP server, command, or skill), register/copy it at **USER scope** (`/root/.claude.json`, `/root/.claude/`) so it's available everywhere — not project scope.
+4. Lead the reply with the paste-ready first message in a code block. Keep it self-contained so a blank session executes with zero re-explaining.
+
 ## PAST MISTAKES — DON'T REPEAT THESE
 - **Zombie processes**: PID 1 was `tail -f /dev/null` → 1200+ zombies. Fix: `--init` flag in Docker `runArgs`.
 - **GitHub auth lost on rebuild**: was using HTTPS remote + no credential helper. Fix: SSH deploy key on persistent volume, auto-configured by post-start.sh.
@@ -143,7 +154,7 @@ If `$USER=root` and `$HOME=/root` but `whoami=node`, you ARE root. Don't waste a
 
 ## WHO ALEX IS
 - Building AI Arena (multi-model comparison) and Ad Spy (FB Ad Library intelligence)
-- Running on Railway + Hetzner VPS, developing in Docker dev containers
+- Running self-hosted on a Hetzner VPS, developing in Docker dev containers
 - Not a full-time developer — focus on shipping fast, keeping things simple
 - Uses Claude Code via Desktop app, Remote Control (mobile), and SSH
 

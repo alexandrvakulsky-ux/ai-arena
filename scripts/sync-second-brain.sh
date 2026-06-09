@@ -17,8 +17,11 @@ cd "$MIRROR"
 git remote set-url origin "$URL"
 git fetch -q origin main && git reset -q --hard origin/main
 
-# Copy only the clean, non-secret files (mirrors the initial snapshot set).
-for f in bot.js tools.js vectorstore.js seed-sources.json memory.md journal.md package.json README.md .gitignore; do
+# SECURITY: memory.md + journal.md contain DM-derived context, coworker names and
+# Telegram user IDs — they must NEVER be synced. Delete any previously-pushed copies.
+rm -f "$MIRROR/memory.md" "$MIRROR/journal.md" 2>/dev/null || true
+# Copy only the clean, non-secret source files.
+for f in bot.js tools.js vectorstore.js seed-sources.json package.json README.md .gitignore; do
   [ -f "$SRC/$f" ] && cp "$SRC/$f" "$MIRROR/$f" || true
 done
 

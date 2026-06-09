@@ -40,6 +40,12 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const PASSPHRASE = process.env.TELEGRAM_PASSPHRASE || 'futureproof-scout';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
+// fetch() error messages can embed the full Telegram URL (which contains the bot token);
+// strip the token from anything we log.
+const redact = (s) => String(s == null ? '' : s).split(TOKEN || '\0impossible\0').join('***');
+// Strip unpaired UTF-16 surrogates (e.g. an emoji cut in half) — a lone surrogate makes the
+// JSON body invalid for the Anthropic API ("no low surrogate in string").
+const stripSurrogates = (s) => String(s == null ? '' : s).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
 
 if (!TOKEN) { console.error('[scout-bot] TELEGRAM_BOT_TOKEN missing — exiting'); process.exit(0); }
 if (!ANTHROPIC_KEY) { console.error('[scout-bot] ANTHROPIC_API_KEY missing — exiting'); process.exit(1); }
@@ -54,6 +60,7 @@ fs.mkdirSync(CHATS_DIR, { recursive: true });
 
 const TG = `https://api.telegram.org/bot${TOKEN}`;
 const MODEL = 'claude-opus-4-6';
+const CADENCE_MODEL = 'claude-sonnet-4-6'; // proactive openers — cheaper than Opus, user won't notice
 const MAX_HISTORY_TURNS = 20;
 const HISTORY_KEEP = 40;
 
@@ -101,7 +108,7 @@ function setAuthorizedChatId(id) {
   console.log(`[scout-bot] authorized chat_id=${id}`);
 }
 
-// ── Multi-user (Alex=CEO + CMO wife), ONE shared brain ──────────────────
+// ── Multi-user (Alex=CEO + Lera, his wife), ONE shared brain ──────────────────
 const USERS_FILE = path.join(BOT_DIR, '.authorized_users.json');
 function loadUsers() {
   try { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); }
@@ -118,34 +125,37 @@ function enrollUser(chat_id) {
   const u = loadUsers();
   if (u[chat_id]) return u[chat_id];
   const taken = Object.values(u);
-  const label = !taken.includes('alex') ? 'alex' : !taken.includes('cmo') ? 'cmo' : 'guest';
+  const label = !taken.includes('alex') ? 'alex' : !taken.includes('lera') ? 'lera' : 'guest';
   u[chat_id] = label; saveUsers(u);
   console.log(`[scout-bot] enrolled chat ${chat_id} as ${label}`);
   return label;
 }
-let CURRENT_USER = 'alex';
-function mediationBlock() {
-  const who = CURRENT_USER === 'cmo' ? "the CMO (Alex's wife)" : CURRENT_USER === 'alex' ? 'Alex (CEO)' : CURRENT_USER;
+// Per-reply principal. Passed explicitly through generateReply/mediationBlock/cadence
+// so concurrent handlers + the multi-user cadence loop never read each other's value.
+// (A module global here used to let Alex's owner-only DM persona leak into Lera's reply.)
+function mediationBlock(userLabel = 'alex') {
+  const who = userLabel === 'lera' ? "Lera (Valeria, Alex's wife)" : userLabel === 'alex' ? 'Alex (CEO)' : userLabel;
   return `
 
 ═══ SHARED SECOND BRAIN — TWO PRINCIPALS ═══
 You serve TWO people at Futureproof who share THIS SAME memory + knowledge base:
 - Alex — CEO (product, architecture, roadmap, technical, partnerships)
-- CMO — Alex's wife (marketing, ads, copy, messaging, campaigns, funnel, creative, pricing)
+- Lera (Valeria) — Alex's wife (marketing, ads, copy, messaging, campaigns, funnel, creative, pricing)
 You are currently talking to: ${who}.
 
 SILENT MEDIATION (critical): when their views/instructions differ, do NOT surface the conflict
-("Alex said X but CMO said Y"). Internally synthesize both like a consultant, form your own
+("Alex said X but Lera said Y"). Internally synthesize both like a consultant, form your own
 recommendation, and only escalate if you genuinely cannot reconcile — and then come WITH a
 proposed resolution, never just "you disagree".
 
 DOMAIN WEIGHT MATRIX (apply subtly in internal reasoning; NEVER expose the numbers):
-- Marketing / ads / copy / funnel / creative: CMO 70%, CEO 30%
-- Pricing / monetization: CMO 60%, CEO 40%
-- Product / architecture / roadmap / tech: CEO 70%, CMO 30%
+- Marketing / ads / copy / funnel / creative: Lera 70%, Alex 30%
+- Pricing / monetization: Lera 60%, Alex 40%
+- Product / architecture / roadmap / tech: Alex 70%, Lera 30%
 Weights reflect expertise, not hierarchy. Her marketing/funnel research feeds his product
 decisions; his product insight feeds her marketing. One brain, two perspectives. Attribute what
-you learn to who said it; both can recall everything.`;
+you learn to who said it. Both share the brain — EXCEPT Alex's private Slack DMs, which only
+Alex can recall (their substance still informs the brain's context, but Lera cannot surface them).`;
 }
 
 // ── Telegram client ──────────────────────────────────────────────────────
@@ -238,7 +248,7 @@ async function transcribeVoice(fileId) {
     console.log(`[voice] transcribed ${audioBuf.length}b → ${(data.text || '').length} chars`);
     return data.text || null;
   } catch (err) {
-    console.error('[voice] transcribeVoice error:', err.message);
+    console.error('[voice] transcribeVoice error:', redact(err.message));
     return null;
   }
 }
@@ -271,6 +281,18 @@ async function fetchYouTubeTranscript(videoId) {
     console.error(`[yt] ${videoId} fetch failed:`, err.message);
     return null;
   }
+}
+
+// Download a Telegram file (by file_id) and return it base64-encoded.
+async function downloadTelegramFileB64(fileId) {
+  try {
+    const fileRes = await tg('getFile', { file_id: fileId });
+    if (!fileRes.ok || !fileRes.result.file_path) return null;
+    const url = `https://api.telegram.org/file/bot${TOKEN}/${fileRes.result.file_path}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return (await r.buffer()).toString('base64');
+  } catch (err) { console.error('[pdf] download error:', redact(err.message)); return null; }
 }
 
 function extractMessageContent(msg) {
@@ -389,9 +411,10 @@ You have web_search — use it when you need current info, but don't over-search
 You also have READ-ONLY server tools — use them when Alex asks about server state or live data:
 - query_adspy(path) — GET an ad-spy endpoint. E.g. "/health" for ad/competitor counts, "/api/sc-cost" for SC credit usage, "/api/access-stats" for visitor activity.
 - query_aiarena(path) — GET an ai-arena endpoint. "/health" works.
+- vector_search(query) — semantic search your second-brain (Slack channels, meeting summaries, decisions). Use it whenever asked about a past discussion/decision/meeting, or you need internal Futureproof/Genesis context.
+- firecrawl_scrape(url) — read any web page as clean markdown (competitor landing pages, articles, docs).
 - read_file(path) — read a file under /workspace. .env and credential files are denied. Use for code, configs, journal.md, memory.md, cached data, etc.
 - list_directory(path) — list a /workspace or /tmp directory.
-- git_status() — current git status of /workspace.
 - tail_log(name, lines) — tail server.log, scout-bot.log, auto-deploy.log, or supervisor.log.
 - git_head_info() — current branch + last commit summary.
 
@@ -431,10 +454,16 @@ function processMemoryUpdates(replyText) {
     else remaining.push(line);
   }
   if (memUpdates.length > 0) {
-    const date = new Date().toISOString().slice(0, 10);
-    const append = `\n\n## Updates ${date}\n` + memUpdates.map(u => `- ${u}`).join('\n');
-    fs.appendFileSync(MEMORY_FILE, append);
-    console.log(`[scout-bot] appended ${memUpdates.length} memory update(s)`);
+    let existing = '';
+    try { existing = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch {}
+    const fresh = memUpdates.filter(u => !existing.includes(u)); // skip already-recorded lines
+    if (fresh.length > 0) {
+      const date = new Date().toISOString().slice(0, 10);
+      const append = `\n\n## Updates ${date}\n` + fresh.map(u => `- ${u}`).join('\n');
+      fs.appendFileSync(MEMORY_FILE, append);
+      const dup = memUpdates.length - fresh.length;
+      console.log(`[scout-bot] appended ${fresh.length} memory update(s)${dup ? ` (${dup} dup skipped)` : ''}`);
+    }
   }
   return remaining.join('\n').trim();
 }
@@ -442,17 +471,35 @@ function processMemoryUpdates(replyText) {
 // Custom tools the bot can call (read-only — query ad-spy, query ai-arena,
 // read files, list dirs, git status, tail logs). See tools.js.
 const { TOOL_SCHEMAS: BOT_TOOLS, executeTool } = require('./tools');
-const MAX_TOOL_ITERATIONS = 10;
+const MAX_TOOL_ITERATIONS = 8;
 
-async function generateReply(chat_id, userMessage, systemOverride = null) {
+async function generateReply(chat_id, userMessage, systemOverride = null, attachment = null, userLabel = 'alex') {
   let history = loadHistory(chat_id);
   history.push({ role: 'user', content: userMessage, ts: Date.now() });
   // Build messages from stored history (plain text turns only).
   let messages = history.slice(-MAX_HISTORY_TURNS).map(({ role, content }) => ({ role, content }));
+  // If this turn carries a file (e.g. a PDF), make the latest user turn multimodal
+  // for THIS call only — the base64 is never stored in history (so it isn't re-sent later).
+  if (attachment && messages.length) {
+    const last = messages[messages.length - 1];
+    last.content = [attachment, { type: 'text', text: typeof last.content === 'string' ? last.content : userMessage }];
+  }
 
   // Agentic loop: call API, execute any tool_use blocks, feed results
   // back, repeat until Claude stops calling tools (final answer).
   let finalText = '';
+  let lastText = '';
+  // Build the static system + tools ONCE and mark them for prompt caching, so the big
+  // system prompt + tools schema aren't re-billed at full price across tool-loop iterations
+  // (or across back-to-back messages within the cache TTL). Same model, same output, ~90% off
+  // the cached input tokens.
+  const sysText = (systemOverride || buildSystemPrompt()) + mediationBlock(userLabel);
+  const sysBlocks = [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }];
+  const toolsArr = [
+    { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
+    ...BOT_TOOLS,
+  ];
+  toolsArr[toolsArr.length - 1] = { ...toolsArr[toolsArr.length - 1], cache_control: { type: 'ephemeral' } };
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     let data;
     try {
@@ -467,12 +514,9 @@ async function generateReply(chat_id, userMessage, systemOverride = null) {
         body: JSON.stringify({
           model: MODEL,
           max_tokens: 3000,
-          system: (systemOverride || buildSystemPrompt()) + mediationBlock(),
+          system: sysBlocks,
           messages,
-          tools: [
-            { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
-            ...BOT_TOOLS,
-          ],
+          tools: toolsArr,
         }),
         timeout: 120000,
       });
@@ -491,6 +535,7 @@ async function generateReply(chat_id, userMessage, systemOverride = null) {
     const ourTools = new Set(BOT_TOOLS.map(t => t.name));
     const toolUses = content.filter(c => c.type === 'tool_use' && ourTools.has(c.name));
     const textBlocks = content.filter(c => c.type === 'text');
+    if (textBlocks.length) lastText = textBlocks.map(c => c.text).join('\n\n'); // keep latest interim text
 
     if (toolUses.length === 0) {
       // No more tool calls — this is the final response.
@@ -509,13 +554,33 @@ async function generateReply(chat_id, userMessage, systemOverride = null) {
       toolResults.push({
         type: 'tool_result',
         tool_use_id: t.id,
-        content: typeof result === 'string' ? result : JSON.stringify(result),
+        content: stripSurrogates(typeof result === 'string' ? result : JSON.stringify(result)),
       });
     }
     messages.push({ role: 'user', content: toolResults });
   }
 
-  if (!finalText) finalText = '(no response — tool loop exhausted)';
+  if (!finalText) {
+    // Used all tool steps without concluding — force ONE final answer with no tools,
+    // so the user gets a real reply instead of a placeholder. messages ends in a
+    // tool_result turn, so omitting `tools` makes the model answer in text.
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 1500,
+          system: sysBlocks,
+          messages,
+        }),
+        timeout: 60000,
+      });
+      const d = await r.json();
+      if (!d.error) finalText = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n\n').trim();
+    } catch (e) { console.error('[anthropic] final-answer fallback failed:', e.message); }
+    if (!finalText) finalText = lastText || "ran out of tool steps before I could finish — try narrowing the question?";
+  }
   const cleanReply = processMemoryUpdates(finalText);
 
   // Persist ONLY the simple text turns to disk (not the tool calls).
@@ -621,6 +686,24 @@ async function handleMessage(msg) {
     return;
   }
 
+  // ── PDF documents → Claude reads them natively (text, tables, layout) ──
+  let pdfBlock = null;
+  const doc = msg.document;
+  if (doc && (/application\/pdf/.test(doc.mime_type || '') || /\.pdf$/i.test(doc.file_name || ''))) {
+    if ((doc.file_size || 0) > 18 * 1024 * 1024) {
+      await sendMessage(chat_id, `That PDF is too big (Telegram caps bot downloads at ~20MB). Send a smaller file or a link.`);
+      return;
+    }
+    await tg('sendChatAction', { chat_id, action: 'typing' });
+    await sendMessage(chat_id, '📄 reading PDF...');
+    const b64 = await downloadTelegramFileB64(doc.file_id);
+    if (!b64) { await sendMessage(chat_id, `Couldn't download that PDF — try again?`); return; }
+    pdfBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 }, cache_control: { type: 'ephemeral' } };
+    const cap = (msg.caption || '').trim();
+    msg.text = `[PDF: ${doc.file_name || 'document'}]` + (cap ? ` ${cap}` : ` Read this and tell me what matters.`);
+    msg.caption = '';
+  }
+
   // Extract usable content (text, caption, forwarded metadata). Returns
   // null for empty/media-only messages (stickers, photo without caption, etc).
   let content = extractMessageContent(msg);
@@ -631,13 +714,12 @@ async function handleMessage(msg) {
   if (!label) {
     if (text.includes(PASSPHRASE)) {
       label = enrollUser(chat_id);
-      const who = label === 'cmo' ? 'CMO (marketing lead)' : label === 'alex' ? 'CEO' : 'guest';
-      await sendMessage(chat_id, `Authorized as ${who}. We share one second brain — memory, ad-spy/ai-arena tools, and find history are common to both you and ${label === 'alex' ? 'the CMO' : 'Alex'}. Ping me anytime, send voice notes or YouTube links, ask "what did we decide about X". Type /help for commands.`);
+      const who = label === 'lera' ? 'Lera (marketing lead)' : label === 'alex' ? 'CEO' : 'guest';
+      await sendMessage(chat_id, `Authorized as ${who}. We share one second brain — memory, ad-spy/ai-arena tools, and find history are common to both you and ${label === 'alex' ? 'Lera' : 'Alex'}. Ping me anytime, send voice notes or YouTube links, ask "what did we decide about X". Type /help for commands.`);
       return;
     }
     return; // unknown chat, no passphrase — ignore
   }
-  CURRENT_USER = label;
 
   // Empty / media-only messages (sticker, photo no caption, etc): be polite.
   if (isEmpty) {
@@ -683,19 +765,22 @@ async function handleMessage(msg) {
   }
 
   // Capture short user content to journal so future questions can reference it.
-  if (content.length > 5 && content.length < 2000) appendJournal(`${CURRENT_USER}: ${content.slice(0, 500)}`);
+  if (content.length > 5 && content.length < 2000) appendJournal(`${label}: ${content.slice(0, 500)}`);
 
   // Shared semantic memory: store every message; recall on recall-style questions.
   if (vectorstore.enabled()) {
-    vectorstore.store('user', content, CURRENT_USER).catch(() => {});
+    vectorstore.store('user', content, label).catch(() => {});
     if (vectorstore.looksLikeRecall(text)) {
-      const hits = await vectorstore.recall(content, 5);
+      const hits = await vectorstore.recall(content, 3, { isOwner: label === 'alex' });
       if (hits.length) content += `\n\n[Recalled from shared second-brain memory]\n` + hits.map((hh) => `- (${hh.user}) ${hh.content}`).join('\n');
     }
   }
 
+  // Strip unpaired UTF-16 surrogates before they reach the Anthropic API.
+  content = stripSurrogates(content);
+
   await tg('sendChatAction', { chat_id, action: 'typing' });
-  const reply = await generateReply(chat_id, content);
+  const reply = await generateReply(chat_id, content, null, pdfBlock, label);
   if (reply && reply.trim()) {
     appendJournal(`bot: ${reply.slice(0, 200)}${reply.length > 200 ? '…' : ''}`);
     await sendMessage(chat_id, reply);
@@ -703,6 +788,17 @@ async function handleMessage(msg) {
 }
 
 // ── Long-poll loop ──────────────────────────────────────────────────────
+// Per-chat serialization: two rapid messages from the same chat must not both
+// loadHistory→append→saveHistory concurrently (last writer wins, turns lost).
+// Each chat gets a promise chain so its handlers run strictly in order; different
+// chats still run in parallel.
+const chatQueues = new Map();
+function enqueue(chat_id, fn) {
+  const prev = chatQueues.get(chat_id) || Promise.resolve();
+  const next = prev.then(fn).catch(e => console.error('[handler]', e.message));
+  chatQueues.set(chat_id, next.finally(() => { if (chatQueues.get(chat_id) === next) chatQueues.delete(chat_id); }));
+  return next;
+}
 let offset = 0;
 async function poll() {
   try {
@@ -712,7 +808,8 @@ async function poll() {
       for (const update of data.result) {
         offset = update.update_id + 1;
         if (update.message) {
-          handleMessage(update.message).catch(e => console.error('[handler]', e.message));
+          const cid = update.message.chat && update.message.chat.id;
+          enqueue(cid, () => handleMessage(update.message));
         }
       }
     } else if (data.error_code) {
@@ -720,7 +817,7 @@ async function poll() {
       await new Promise(r => setTimeout(r, 10000));
     }
   } catch (err) {
-    if (err.code !== 'ETIMEDOUT') console.error('[poll]', err.message);
+    if (err.code !== 'ETIMEDOUT') console.error('[poll]', redact(err.message));
     await new Promise(r => setTimeout(r, 5000));
   }
   setImmediate(poll);
@@ -751,11 +848,6 @@ const PROMPTS = {
 };
 
 async function fireCadence(cadence) {
-  const chat_id = authorizedChatId();
-  if (!chat_id) {
-    console.log(`[cadence] ${cadence.key} skipped — no authorized chat`);
-    return;
-  }
   if (isSnoozed()) {
     console.log(`[cadence] ${cadence.key} skipped — bot is snoozed`);
     return;
@@ -765,55 +857,52 @@ async function fireCadence(cadence) {
     return;
   }
 
-  console.log(`[cadence] firing ${cadence.key}`);
-  const instructions = PROMPTS[cadence.prompt];
-
-  // Generate the opener via Claude (it'll be context-aware via system prompt).
-  // We feed instructions as a "user" message so Claude treats it as a task spec,
-  // but the response goes BACK to Alex on Telegram — so we strip "Alex" prefix etc.
-  // To avoid polluting history, we don't save this synthetic user turn.
-  let openerText = '';
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 400,
-        system: buildSystemPrompt() + mediationBlock(),
-        messages: [{ role: 'user', content: instructions }],
-      }),
-      timeout: 30000,
-    });
-    const data = await r.json();
-    if (data.error) {
-      console.error('[cadence] api error:', data.error);
-      return;
-    }
-    openerText = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n\n').trim();
-    openerText = processMemoryUpdates(openerText);
-  } catch (err) {
-    console.error('[cadence]', err.message);
+  const users = Object.entries(loadUsers()); // [chat_id, label]
+  if (!users.length) {
+    console.log(`[cadence] ${cadence.key} skipped — no authorized users`);
     return;
   }
+  const instructions = PROMPTS[cadence.prompt];
 
-  if (!openerText) return;
+  // Fire to EACH user separately, addressing the opener to the right person via
+  // mediationBlock(label) — otherwise the shared memory.md context makes the model
+  // address the wrong person.
+  for (const [chat_id, label] of users) {
+    console.log(`[cadence] firing ${cadence.key} for ${label} (chat ${chat_id})`);
 
-  // Inject into conversation history as if assistant said it (so Alex's reply
-  // continues the conversation in the normal generateReply flow).
-  const history = loadHistory(chat_id);
-  history.push({ role: 'assistant', content: openerText, ts: Date.now() });
-  saveHistory(chat_id, history);
-  appendJournal(`bot (${cadence.key}): ${openerText.slice(0, 200)}${openerText.length > 200 ? '…' : ''}`);
+    let openerText = '';
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: CADENCE_MODEL,
+          max_tokens: 400,
+          system: [{ type: 'text', text: buildSystemPrompt() + mediationBlock(label), cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: instructions }],
+        }),
+        timeout: 30000,
+      });
+      const data = await r.json();
+      if (data.error) { console.error('[cadence] api error:', data.error); continue; }
+      openerText = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n\n').trim();
+      openerText = processMemoryUpdates(openerText);
+    } catch (err) { console.error('[cadence]', err.message); continue; }
 
-  try {
-    await sendMessage(chat_id, openerText);
-  } catch (err) {
-    console.error('[cadence] send failed:', err.message);
+    if (!openerText) continue;
+
+    // Inject into THIS user's history so their reply continues normally.
+    const history = loadHistory(chat_id);
+    history.push({ role: 'assistant', content: openerText, ts: Date.now() });
+    saveHistory(chat_id, history);
+    appendJournal(`bot→${label} (${cadence.key}): ${openerText.slice(0, 200)}${openerText.length > 200 ? '…' : ''}`);
+
+    try { await sendMessage(chat_id, openerText); }
+    catch (err) { console.error('[cadence] send failed:', err.message); }
   }
 }
 

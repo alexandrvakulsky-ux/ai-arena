@@ -90,6 +90,16 @@ disown
 # Root Claude setup: credentials, settings, and bypass-permissions wrapper
 sudo /usr/local/bin/setup-root-claude.sh || echo "Root Claude setup skipped (script not found or failed)"
 
+# Durable aidesigner MCP auth: mint a fresh bearer header from the stored refresh
+# token and register the server in each user's ~/.claude.json BEFORE any session
+# (incl. the tmux session below) starts. Run once per user so file ownership stays
+# correct. No-op if the durable auth has not been bootstrapped (no refresh token).
+if [ -f /home/node/.claude/scripts/aidesigner-refresh.sh ] && [ -f /home/node/.claude/aidesigner/refresh_token ]; then
+    bash /home/node/.claude/scripts/aidesigner-refresh.sh 2>/dev/null || true            # node ~/.claude.json
+    sudo HOME=/root bash /home/node/.claude/scripts/aidesigner-refresh.sh 2>/dev/null || true  # root ~/.claude.json
+    echo "aidesigner MCP pre-registered with durable bearer header."
+fi
+
 # Auto-start Claude Code in a persistent tmux session (enables mobile remote control)
 export PATH=$PATH:/usr/local/share/npm-global/bin
 if command -v claude &>/dev/null && command -v tmux &>/dev/null && [ -f "$HOME/.claude/.credentials.json" ]; then
@@ -107,11 +117,22 @@ elif [ -f "$HOME/.claude/.env.backup" ] && [ ! -f /workspace/.env ]; then
     echo "Restored .env from persistent volume backup."
 fi
 
-# Auto-start server only if .env has real credentials (not placeholder values)
+# Auto-start the full stack only if .env has real credentials (not placeholder values).
+# auto-deploy.sh supervises server.js (3000) + scout-bot (Telegram) + second_brain sync via
+# start_children(), and keeps polling origin/main. Launching it here makes the bot + sync
+# survive container rebuilds (previously only the bare server was auto-started).
 if [ -f /workspace/.env ] && ! grep -q "your-key-here\|your-password-here" /workspace/.env; then
     cd /workspace
-    nohup npm start >> /tmp/ai-arena-server.log 2>&1 &
-    echo "Server starting on port 3000 (logs: /tmp/ai-arena-server.log)"
+    if [ -f /workspace/scripts/auto-deploy.sh ]; then
+        pkill -f scripts/auto-deploy.sh 2>/dev/null || true
+        nohup bash /workspace/scripts/auto-deploy.sh >> /workspace/auto-deploy.log 2>&1 &
+        disown
+        echo "auto-deploy started — supervises server (3000) + scout-bot + second_brain sync."
+    else
+        nohup npm start >> /tmp/ai-arena-server.log 2>&1 &
+        echo "Server starting on port 3000 (auto-deploy.sh missing — bare server)."
+    fi
 else
-    echo "Server not started — fill in real API keys in /workspace/.env first"
+    echo "Stack not started — fill in real API keys in /workspace/.env first"
 fi
+setsid bash /workspace/scripts/slack-ingest-loop.sh < /dev/null & disown

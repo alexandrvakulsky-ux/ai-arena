@@ -93,17 +93,17 @@ Small personal project — prioritize simplicity over enterprise complexity. Sin
 Skip: WAF, DDoS protection, SOC2, multi-region, auto-scaling, read replicas — overkill at this scale.
 
 ## Infrastructure Rules
-- Runtime: Docker devcontainer on Hetzner VPS (135.181.153.92), deployed via Railway from GitHub
+- Runtime: Docker devcontainer on Hetzner VPS (135.181.153.92), self-hosted (auto-deploy.sh from GitHub main; Railway retired 2026-05-26)
 - Never suggest mounting local files into containers
 - Never hardcode IPs — use service names or env vars
-- Always assume the app runs on Hetzner or Railway, never on a developer's machine
-- All secrets via Railway env vars or `/workspace/.env` (never committed)
+- Always assume the app runs on Hetzner (self-hosted), never on a developer's machine
+- All secrets via `/workspace/.env` (never committed)
 - Docker volumes: named volumes only — never local bind mounts
 - If you find any remnant of the old local Docker setup, remove it
 
 ## Reproduce this setup on a new machine
 Run `bash scripts/new-machine-setup.sh` — it handles SSH key, config, and connection test.
-Then fill in API keys: `nano /workspace/.env` (copy from Railway dashboard).
+Then fill in API keys in `/workspace/.env` (restored from the persistent volume backup at $HOME/.claude/.env.backup).
 
 ## Learning rules
 When the user corrects my approach or confirms something worked well, update the relevant rules file immediately to lock in the lesson.

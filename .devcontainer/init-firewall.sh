@@ -101,6 +101,8 @@ REQUIRED_DOMAINS=(
     api.telegram.org
     # AIDesigner MCP server — frontend design generator (project-scope MCP)
     api.aidesigner.ai
+    # Firecrawl — web scraping for the scout-bot firecrawl_scrape tool
+    api.firecrawl.dev
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 

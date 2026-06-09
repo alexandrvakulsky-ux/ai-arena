@@ -278,6 +278,6 @@ docker system prune -a
 4. Restart the container
 
 ### Application secrets lost
-1. Check Railway dashboard for environment variable values
-2. Recreate `/workspace/.env` with the keys from Railway
+1. Restore /workspace/.env from the persistent backup ($HOME/.claude/.env.backup)
+2. (post-start.sh restores it automatically if missing)
 3. Restart the application
