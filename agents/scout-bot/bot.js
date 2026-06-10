@@ -850,6 +850,10 @@ const CADENCES = [
   { day: 1, hour: 9, key: 'mcp-scout', prompt: 'mcp-scout' },         // any mode
   { day: 4, hour: 9, key: 'futureproof-scout', prompt: 'futureproof-scout' },
   { day: 0, hour: 17, key: 'sunday-wrap', prompt: 'sunday-wrap' },
+  // Lera's daily creative brief (act_mq8a2xpk_a18d + amendments _e2lw, _zjii).
+  // days array = Mon-Sat; 06:00 UTC = 09:00 Kyiv (summer). handler routes it to
+  // the agentic fireCreativeTrends instead of the plain single-call cadence.
+  { days: [1, 2, 3, 4, 5, 6], hour: 6, key: 'creative-trends', handler: 'creative-trends' },
 ];
 
 const PROMPTS = {
@@ -862,7 +866,73 @@ const PROMPTS = {
   'sunday-wrap': `It's Sunday 5pm. Generate a soft weekly wrap-up message. Reference the journal entries from this past week if any. Ask: "what shipped this week?", "what's on your mind for next?", and one specific reference back to something he mentioned earlier in the week if possible. Output ONLY the message text, conversational, max 4 short sentences.`,
 };
 
+// ── Lera's daily creative-trends brief ──────────────────────────────────
+// Unlike plain cadences (one cheap Sonnet call), this needs the agentic tool
+// loop: query_adspy for fresh competitor creatives + web_search for viral
+// trends, then 10 trend-anchored hooks in Lera's locked style. Spec from
+// pending actions act_mq8a2xpk_a18d + amendments act_mq8a56rb_e2lw (broad
+// 25-65+ audience w/ hypothesis notes) + act_mq8a7jg3_zjii (every hook must
+// derive from an observed trend and cite it inline).
+const SENT_HOOKS_FILE = path.join(BOT_DIR, 'sent-hooks.json');
+const CREATIVE_TRENDS_SPEC = `
+
+═══ TASK: DAILY CREATIVE-TRENDS BRIEF FOR LERA ═══
+Generate Lera's daily creative brief for Futureproof (data-leak / email-leak / accounts-leak topic). Use your tools — do not skip steps:
+
+STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new') (and '/api/brief/today' if it returns data). Look at fresh ads across ALL tracked competitors — Digital Security (Cloaked, Guardio, Aura, Norton, Incogni...) AND Genesis-vertical brands (incl. Deepstash). Identify 2-4 recurring patterns: hook formats (POV/confession/listicle/UGC), themes, visual mechanics, emotional angles. Note which competitor and roughly how many ads share each pattern.
+
+STEP 2 — Pop/viral trend scan: web_search for current viral trends from the last 7 days (meme formats, TikTok/IG formats, big pop-culture or news moments). Keep ONLY trends that can be credibly bridged to the data-leak topic.
+
+STEP 3 — Write EXACTLY 10 hooks/POVs in Lera's locked style (dark/provocative honest-leak confession + POV formats — her creative direction is in your memory). Broad 25-65+ audience; do NOT split into demographic segments. EVERY hook must: (a) cite its trend source inline — "[from: Incogni 'price of your data' series]" or "[from: <meme/format name>]"; (b) end with a one-line hypothesis about expected audience skew — "hypothesis: meme-native, skews 25-40" / "hypothesis: family-protection angle, strongest 50+". Mix ≈5-6 competitor-derived / ≈4-5 pop-trend-derived (flex if one source is dry today).
+
+STEP 4 — Do NOT repeat or closely paraphrase any previously sent hook (list below), and avoid re-flagging the same competitor pattern more than 2 days running.
+
+OUTPUT — one compact Telegram message, no walls of text:
+• Trend snapshot: 3-5 bullets (what competitors push + what's viral)
+• Then the 10 numbered hooks (1. … 10.), each with its [from: …] tag + hypothesis line.`;
+
+function loadSentHooks() {
+  try { return JSON.parse(fs.readFileSync(SENT_HOOKS_FILE, 'utf8')); } catch { return []; }
+}
+function appendSentHooks(lines) {
+  if (!lines.length) return;
+  const all = loadSentHooks().concat(lines);
+  try { fs.writeFileSync(SENT_HOOKS_FILE, JSON.stringify(all.slice(-400), null, 2)); }
+  catch (e) { console.error('[creative-trends] sent-hooks save failed:', e.message); }
+}
+
+async function fireCreativeTrends(cadence) {
+  const entry = Object.entries(loadUsers()).find(([, label]) => label === 'lera');
+  if (!entry) { console.log('[creative-trends] skipped — Lera not enrolled'); return; }
+  const [chat_id] = entry;
+  console.log(`[creative-trends] firing for lera (chat ${chat_id})`);
+
+  const prior = loadSentHooks().slice(-60);
+  const spec = CREATIVE_TRENDS_SPEC +
+    `\n\nPREVIOUSLY SENT HOOKS (do not repeat):\n` +
+    (prior.length ? prior.map(h => `- ${h}`).join('\n') : '(none yet — first run)');
+
+  // Serialize through the same per-chat queue as live handlers — generateReply
+  // does loadHistory→save and must not race an in-flight message from Lera.
+  await enqueue(Number(chat_id), async () => {
+    const reply = await generateReply(
+      chat_id,
+      'Generate my daily creative-trends brief.',
+      buildSystemPrompt() + spec,
+      null,
+      'lera'
+    );
+    if (!reply || !reply.trim()) { console.log('[creative-trends] empty reply — nothing sent'); return; }
+    appendJournal(`bot→lera (creative-trends): ${reply.slice(0, 200)}…`);
+    const hookLines = reply.split('\n').map(l => l.trim()).filter(l => /^\d{1,2}[.)]\s/.test(l));
+    appendSentHooks(hookLines);
+    try { await sendMessage(chat_id, reply); }
+    catch (err) { console.error('[creative-trends] send failed:', err.message); }
+  });
+}
+
 async function fireCadence(cadence) {
+  if (cadence.handler === 'creative-trends') return fireCreativeTrends(cadence);
   if (isSnoozed()) {
     console.log(`[cadence] ${cadence.key} skipped — bot is snoozed`);
     return;
@@ -941,7 +1011,8 @@ function startScheduler() {
     const today = now.toISOString().slice(0, 10);
 
     for (const c of CADENCES) {
-      if (c.day !== day || c.hour !== hour) continue;
+      const dayMatch = Array.isArray(c.days) ? c.days.includes(day) : c.day === day;
+      if (!dayMatch || c.hour !== hour) continue;
       const fireKey = `${c.key}-${today}`;
       if (alreadyFired(fireKey)) continue;
       markFired(fireKey);
@@ -957,3 +1028,11 @@ console.log(`[scout-bot] authorized chat_id: ${authed || '(none — first /start
 console.log(`[scout-bot] mode: ${loadState().mode}, snoozed: ${isSnoozed()}`);
 poll();
 startScheduler();
+// One-shot manual cadence trigger for testing: FIRE_NOW=<cadence-key> fires that
+// cadence ~5s after boot in THIS instance (never start a second process — two
+// long-pollers on one Telegram token fight over getUpdates).
+if (process.env.FIRE_NOW) {
+  const c = CADENCES.find(x => x.key === process.env.FIRE_NOW);
+  if (c) setTimeout(() => fireCadence(c).catch(e => console.error('[fire-now]', e.message)), 5000);
+  else console.error(`[fire-now] unknown cadence key: ${process.env.FIRE_NOW}`);
+}
