@@ -59,8 +59,8 @@ const JOURNAL_FILE = path.join(BOT_DIR, 'journal.md');
 fs.mkdirSync(CHATS_DIR, { recursive: true });
 
 const TG = `https://api.telegram.org/bot${TOKEN}`;
-const MODEL = 'claude-opus-4-6';
-const CADENCE_MODEL = 'claude-sonnet-4-6'; // proactive openers — cheaper than Opus, user won't notice
+const MODEL = 'claude-fable-5'; // chat answers — most capable tier (Alex: complex questions need complex answers)
+const CADENCE_MODEL = 'claude-sonnet-4-6'; // proactive openers — cheaper than Fable, user won't notice
 const MAX_HISTORY_TURNS = 20;
 const HISTORY_KEEP = 40;
 
