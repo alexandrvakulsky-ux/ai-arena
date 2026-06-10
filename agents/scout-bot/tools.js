@@ -532,12 +532,13 @@ function execGitHeadInfo() {
 }
 
 // ── Semantic search over the second-brain (reuses vectorstore.js) ───────
-async function execVectorSearch({ query, limit }) {
+async function execVectorSearch({ query, limit }, opts = {}) {
   if (!query || typeof query !== 'string') return 'ERROR: query required';
   if (!vectorstore.enabled()) return 'ERROR: vector store disabled (no OPENAI_API_KEY)';
   const n = Math.min(Math.max(parseInt(limit) || 5, 1), 10);
-  // No isOwner → shared content only; never surfaces private 1:1 DMs via this tool.
-  const hits = await vectorstore.recall(query, n, {});
+  // Owner (Alex) may surface his private 1:1 Slack DMs; everyone else gets shared
+  // content only. Matches the implicit recall path and the system-prompt promise.
+  const hits = await vectorstore.recall(query, n, { isOwner: !!opts.isOwner });
   if (!hits.length) return 'No relevant memories found.';
   return hits.map((h) => `(${h.user || '?'}, score ${(h.score || 0).toFixed(2)}) ${h.content}`).join('\n\n');
 }
@@ -565,12 +566,12 @@ async function execFirecrawlScrape({ url }) {
 }
 
 // ── Dispatcher ──────────────────────────────────────────────────────────
-async function executeTool(name, input) {
+async function executeTool(name, input, opts = {}) {
   try {
     switch (name) {
       case 'query_adspy': return await execQueryAdspy(input || {});
       case 'query_aiarena': return await execQueryAiarena(input || {});
-      case 'vector_search': return await execVectorSearch(input || {});
+      case 'vector_search': return await execVectorSearch(input || {}, opts);
       case 'firecrawl_scrape': return await execFirecrawlScrape(input || {});
       case 'read_file': return execReadFile(input || {});
       case 'list_directory': return execListDirectory(input || {});

@@ -478,6 +478,10 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
   history.push({ role: 'user', content: userMessage, ts: Date.now() });
   // Build messages from stored history (plain text turns only).
   let messages = history.slice(-MAX_HISTORY_TURNS).map(({ role, content }) => ({ role, content }));
+  // The API requires the first message to be `user`. A cadence opener is stored as a
+  // lone `assistant` turn, so a fresh chat (or a slice that starts mid-pair) can lead
+  // with assistant → 400 "first message must be user". Drop leading non-user turns.
+  while (messages.length && messages[0].role !== 'user') messages.shift();
   // If this turn carries a file (e.g. a PDF), make the latest user turn multimodal
   // for THIS call only — the base64 is never stored in history (so it isn't re-sent later).
   if (attachment && messages.length) {
@@ -550,7 +554,7 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
     const toolResults = [];
     for (const t of toolUses) {
       console.log(`[tool] ${t.name}(${JSON.stringify(t.input).slice(0, 100)})`);
-      const result = await executeTool(t.name, t.input);
+      const result = await executeTool(t.name, t.input, { isOwner: userLabel === 'alex' });
       toolResults.push({
         type: 'tool_result',
         tool_use_id: t.id,
@@ -561,18 +565,26 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
   }
 
   if (!finalText) {
-    // Used all tool steps without concluding — force ONE final answer with no tools,
-    // so the user gets a real reply instead of a placeholder. messages ends in a
-    // tool_result turn, so omitting `tools` makes the model answer in text.
+    // Used all tool steps without concluding — force ONE final text answer.
+    // messages still contains assistant tool_use blocks, so we MUST keep `tools`
+    // (+ the web-search beta header) or the API 400s on tool blocks that reference
+    // absent tools. tool_choice:'none' is the supported way to forbid new tool calls.
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        headers: {
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-beta': 'web-search-2025-03-05',
+        },
         body: JSON.stringify({
           model: MODEL,
           max_tokens: 1500,
           system: sysBlocks,
           messages,
+          tools: toolsArr,
+          tool_choice: { type: 'none' },
         }),
         timeout: 60000,
       });
@@ -795,8 +807,11 @@ async function handleMessage(msg) {
 const chatQueues = new Map();
 function enqueue(chat_id, fn) {
   const prev = chatQueues.get(chat_id) || Promise.resolve();
-  const next = prev.then(fn).catch(e => console.error('[handler]', e.message));
-  chatQueues.set(chat_id, next.finally(() => { if (chatQueues.get(chat_id) === next) chatQueues.delete(chat_id); }));
+  const next = prev.then(fn).catch(e => console.error('[handler]', e && e.message ? e.message : e));
+  // Store the SAME promise we compare against in finally — comparing against `next`
+  // (a different promise than the one stored) made the delete dead code → unbounded leak.
+  const stored = next.finally(() => { if (chatQueues.get(chat_id) === stored) chatQueues.delete(chat_id); });
+  chatQueues.set(chat_id, stored);
   return next;
 }
 let offset = 0;
@@ -895,14 +910,19 @@ async function fireCadence(cadence) {
 
     if (!openerText) continue;
 
-    // Inject into THIS user's history so their reply continues normally.
-    const history = loadHistory(chat_id);
-    history.push({ role: 'assistant', content: openerText, ts: Date.now() });
-    saveHistory(chat_id, history);
-    appendJournal(`bot→${label} (${cadence.key}): ${openerText.slice(0, 200)}${openerText.length > 200 ? '…' : ''}`);
-
-    try { await sendMessage(chat_id, openerText); }
-    catch (err) { console.error('[cadence] send failed:', err.message); }
+    // Inject into THIS user's history + send, serialized through the SAME per-chat
+    // queue as live message handlers. Number(chat_id): loadUsers() keys are strings
+    // but poll() enqueues numeric chat ids, and a Map treats "123" and 123 as distinct
+    // keys — without the cast the cadence write races an in-flight handleMessage and
+    // one clobbers the other's history (the lost-update bug the queue exists to stop).
+    await enqueue(Number(chat_id), async () => {
+      const history = loadHistory(chat_id);
+      history.push({ role: 'assistant', content: openerText, ts: Date.now() });
+      saveHistory(chat_id, history);
+      appendJournal(`bot→${label} (${cadence.key}): ${openerText.slice(0, 200)}${openerText.length > 200 ? '…' : ''}`);
+      try { await sendMessage(chat_id, openerText); }
+      catch (err) { console.error('[cadence] send failed:', err.message); }
+    });
   }
 }
 
@@ -913,7 +933,10 @@ function startScheduler() {
     const day = now.getUTCDay();
     const hour = now.getUTCHours();
     const minute = now.getUTCMinutes();
-    if (minute !== 0) return;
+    // Fire in a 0–5 min window, not exactly minute 0: a synchronous stall (the two
+    // execSync calls in loadContextSnapshot can block ~10s) or timer drift can skip
+    // the single minute-0 tick entirely. The per-day fireKey dedup prevents re-firing.
+    if (minute > 5) return;
 
     const today = now.toISOString().slice(0, 10);
 
