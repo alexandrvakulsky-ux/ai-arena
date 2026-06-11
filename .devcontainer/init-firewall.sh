@@ -103,6 +103,8 @@ REQUIRED_DOMAINS=(
     api.aidesigner.ai
     # Firecrawl — web scraping for the scout-bot firecrawl_scrape tool
     api.firecrawl.dev
+    # Meta Ads MCP server — OAuth token exchange + tool calls
+    mcp.facebook.com
 )
 OPTIONAL_DOMAINS=(sentry.io statsig.com)
 

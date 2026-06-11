@@ -719,6 +719,26 @@ async function handleMessage(msg) {
     msg.caption = '';
   }
 
+  // ── Photos → Claude vision + swipe-file ─────────────────────────────────
+  // Forwarded ad screenshots are the swipe-file workflow: Claude breaks down
+  // the hook mechanics and the analysis is stored to vector memory (source:
+  // 'swipe') so "what's in our swipe file about guilt angles?" works later.
+  let imageBlock = null;
+  if (!pdfBlock && Array.isArray(msg.photo) && msg.photo.length) {
+    const ph = msg.photo[msg.photo.length - 1]; // sizes are ascending — take largest
+    await tg('sendChatAction', { chat_id, action: 'typing' });
+    const b64 = await downloadTelegramFileB64(ph.file_id);
+    if (b64) {
+      imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } };
+      const cap = (msg.caption || '').trim();
+      msg.text = cap || '[Screenshot received — if this is an ad creative, do a swipe-file breakdown.]';
+      msg.caption = '';
+    } else {
+      await sendMessage(chat_id, `Couldn't download that photo — try again?`);
+      return;
+    }
+  }
+
   // Extract usable content (text, caption, forwarded metadata). Returns
   // null for empty/media-only messages (stickers, photo without caption, etc).
   let content = extractMessageContent(msg);
@@ -738,7 +758,7 @@ async function handleMessage(msg) {
 
   // Empty / media-only messages (sticker, photo no caption, etc): be polite.
   if (isEmpty) {
-    await sendMessage(chat_id, `Got a message with no text I can read (sticker, photo without caption, etc.). What did you want to discuss about it? I can process text, captions, voice notes, and YouTube links.`);
+    await sendMessage(chat_id, `Got a message with no content I can read (sticker, contact card, etc.). I can process text, captions, voice notes, photos/ad screenshots, PDFs and YouTube links.`);
     return;
   }
 
@@ -796,11 +816,20 @@ async function handleMessage(msg) {
 
   await tg('sendChatAction', { chat_id, action: 'typing' });
   // Creative questions get Lera's locked style + Genesis patterns appended to
-  // the system prompt; unrelated chats skip it (token hygiene).
-  const sysOv = CREATIVE_RE.test(content) ? buildSystemPrompt() + creativeSkillBlock() : null;
-  const reply = await generateReply(chat_id, content, sysOv, pdfBlock, label);
+  // the system prompt; unrelated chats skip it (token hygiene). Images always
+  // get the skill + swipe instructions — most forwarded images ARE ad creatives.
+  const SWIPE_SPEC = imageBlock ? `
+
+═══ IMAGE / SWIPE-FILE PROTOCOL ═══
+If the attached image is an ad creative (or social post used as an ad): start your reply with the literal tag "SWIPE:" then break it down — (1) hook mechanic: format, emotional trigger, social mechanic (tag-bait / debate-bait / voyeur); (2) why it works or doesn't vs our locked style; (3) 1-2 adaptations bridged to the data-leak topic in Lera's locked POV style. Keep it tight. If the image is NOT an ad, skip the tag and just answer normally.` : '';
+  const sysOv = (CREATIVE_RE.test(content) || imageBlock) ? buildSystemPrompt() + creativeSkillBlock() + SWIPE_SPEC : null;
+  const reply = await generateReply(chat_id, content, sysOv, pdfBlock || imageBlock, label);
   if (reply && reply.trim()) {
     appendJournal(`bot: ${reply.slice(0, 200)}${reply.length > 200 ? '…' : ''}`);
+    // Swipe-file: persist ad breakdowns to shared vector memory for later recall.
+    if (imageBlock && /^SWIPE:/m.test(reply) && vectorstore.enabled()) {
+      vectorstore.store('assistant', reply.slice(0, 3500), label, { source: 'swipe' }).catch(() => {});
+    }
     await sendMessage(chat_id, reply);
   }
 }
@@ -860,6 +889,10 @@ const CADENCES = [
   // days array = Mon-Sat; 06:00 UTC = 09:00 Kyiv (summer). handler routes it to
   // the agentic fireCreativeTrends instead of the plain single-call cadence.
   { days: [1, 2, 3, 4, 5, 6], hour: 6, key: 'creative-trends', handler: 'creative-trends' },
+  // Tue 07:00 UTC (10:00 Kyiv) — an hour after the daily brief so they don't stack
+  { day: 2, hour: 7, key: 'reddit-stories', handler: 'reddit-stories' },
+  // Mondays 10:00 UTC — handler self-gates to the FIRST Monday of the month
+  { day: 1, hour: 10, key: 'angle-whitespace', handler: 'angle-whitespace' },
 ];
 
 const PROMPTS = {
@@ -921,15 +954,19 @@ function appendSentHooks(lines) {
   catch (e) { console.error('[creative-trends] sent-hooks save failed:', e.message); }
 }
 
-async function fireCreativeTrends(cadence) {
+// Shared runner for Lera's agentic creative briefs (creative-trends, reddit
+// stories, angle whitespace). Builds spec + prior-hooks dedup, serializes
+// through the per-chat queue, journals, extracts numbered hooks into the
+// shared sent-hooks.json pool, sends.
+async function fireLeraBrief(key, spec, opener) {
   const entry = Object.entries(loadUsers()).find(([, label]) => label === 'lera');
-  if (!entry) { console.log('[creative-trends] skipped — Lera not enrolled'); return; }
+  if (!entry) { console.log(`[${key}] skipped — Lera not enrolled`); return; }
   const [chat_id] = entry;
-  console.log(`[creative-trends] firing for lera (chat ${chat_id})`);
+  console.log(`[${key}] firing for lera (chat ${chat_id})`);
 
   const prior = loadSentHooks().slice(-60);
-  const spec = CREATIVE_TRENDS_SPEC +
-    `\n\nPREVIOUSLY SENT HOOKS (do not repeat):\n` +
+  const fullSpec = spec +
+    `\n\nPREVIOUSLY SENT HOOKS (do not repeat or closely paraphrase):\n` +
     (prior.length ? prior.map(h => `- ${h}`).join('\n') : '(none yet — first run)');
 
   // Serialize through the same per-chat queue as live handlers — generateReply
@@ -937,22 +974,68 @@ async function fireCreativeTrends(cadence) {
   await enqueue(Number(chat_id), async () => {
     const reply = await generateReply(
       chat_id,
-      'Generate my daily creative-trends brief.',
-      buildSystemPrompt() + creativeSkillBlock() + spec,
+      opener,
+      buildSystemPrompt() + creativeSkillBlock() + fullSpec,
       null,
       'lera'
     );
-    if (!reply || !reply.trim()) { console.log('[creative-trends] empty reply — nothing sent'); return; }
-    appendJournal(`bot→lera (creative-trends): ${reply.slice(0, 200)}…`);
+    if (!reply || !reply.trim()) { console.log(`[${key}] empty reply — nothing sent`); return; }
+    appendJournal(`bot→lera (${key}): ${reply.slice(0, 200)}…`);
     const hookLines = reply.split('\n').map(l => l.trim()).filter(l => /^\d{1,2}[.)]\s/.test(l));
     appendSentHooks(hookLines);
     try { await sendMessage(chat_id, reply); }
-    catch (err) { console.error('[creative-trends] send failed:', err.message); }
+    catch (err) { console.error(`[${key}] send failed:`, err.message); }
   });
 }
 
+async function fireCreativeTrends() {
+  return fireLeraBrief('creative-trends', CREATIVE_TRENDS_SPEC, 'Generate my daily creative-trends brief.');
+}
+
+// Weekly Reddit horror-story miner: real victims' stories in the audience's own
+// words → POV confession material. reddit.com is already in the egress allowlist.
+const REDDIT_STORIES_SPEC = `
+
+═══ TASK: WEEKLY REDDIT STORY MINE FOR LERA ═══
+Mine real data-leak / scam victim stories from Reddit and turn them into ad material. Steps:
+
+STEP 1 — web_search for this week's top discussed posts in r/Scams, r/IdentityTheft, r/privacy (queries like "reddit r/Scams" + current scam patterns; restrict to the last 7-14 days where possible). Pick the 5-8 most emotionally charged STORIES (not advice threads).
+STEP 2 — firecrawl_scrape 2-3 of the strongest threads via their old.reddit.com URL to get the full story + top comments. Capture the victims' OWN phrasing — exact words carry the emotion.
+STEP 3 — Distill 4-5 recurring STORY ARCHETYPES (who + what happened + emotional core + 1 short real-language quote fragment each).
+STEP 4 — Write EXACTLY 8 hooks/POVs in Lera's locked style, each derived from an archetype, tagged [from: r/Scams — <archetype>], each ending with a one-line audience-skew hypothesis. Broad 25-65+. Meta-safe wording per the skill.
+
+OUTPUT — one compact Telegram message:
+• 4-5 archetype bullets (story core + real quote fragment)
+• Then the 8 numbered hooks (1. … 8.).`;
+
+async function fireRedditStories() {
+  return fireLeraBrief('reddit-stories', REDDIT_STORIES_SPEC, 'Generate my weekly Reddit story-mine brief.');
+}
+
+// Monthly white-space angle matrix: where competitors crowd vs which
+// emotion×mechanic cells nobody tests. Fires on the FIRST Monday only —
+// the weekly scheduler grid has no day-of-month, so the handler self-gates.
+const ANGLE_WHITESPACE_SPEC = `
+
+═══ TASK: MONTHLY ANGLE WHITE-SPACE MATRIX FOR LERA ═══
+Map the competitive angle landscape and find UNTESTED territory. Steps:
+
+STEP 1 — query_adspy('/api/ads?limit=200&sort=impressions') and query_adspy('/api/ads/new?limit=100'). Each ad carries angle, angle_status, angle_velocity, _competitor, _group fields plus body text.
+STEP 2 — Build a matrix: EMOTION (fear / shame / curiosity / guilt / humor / hope / anger / nostalgia) × MECHANIC (POV confession / tag-a-friend / moral-debate bait / voyeur visual / listicle / UGC testimonial / fake-alert villain / data-shock stat). For each cell note which competitors run it and how heavily (ad counts, days running).
+STEP 3 — Identify: (a) 3-4 SATURATED cells (don't fight there without a twist), (b) 4-5 EMPTY or near-empty cells = white space.
+STEP 4 — For each white-space cell: one-line why it's plausibly untested (hard to pass review? hard to produce? genuinely bad?) + 1 example hook in Lera's locked style bridged to the data-leak topic, with audience-skew hypothesis.
+
+OUTPUT — one compact Telegram message: the matrix summary (saturated vs empty), then numbered white-space opportunities (1. … 5.) each with its example hook.`;
+
+async function fireAngleWhitespace() {
+  if (new Date().getUTCDate() > 7) { console.log('[angle-whitespace] skipped — not the first Monday'); return; }
+  return fireLeraBrief('angle-whitespace', ANGLE_WHITESPACE_SPEC, 'Generate my monthly angle white-space analysis.');
+}
+
 async function fireCadence(cadence) {
-  if (cadence.handler === 'creative-trends') return fireCreativeTrends(cadence);
+  if (cadence.handler === 'creative-trends') return fireCreativeTrends();
+  if (cadence.handler === 'reddit-stories') return fireRedditStories();
+  if (cadence.handler === 'angle-whitespace') return fireAngleWhitespace();
   if (isSnoozed()) {
     console.log(`[cadence] ${cadence.key} skipped — bot is snoozed`);
     return;
