@@ -305,10 +305,10 @@ async function adspyAuth() {
   } catch { adspyToken = null; }
   return adspyToken;
 }
-async function adspyGet(p, token) {
-  const r = await fetch(`${ADSPY_BASE}${p}`, { headers: token ? { 'x-app-token': token } : {}, timeout: 8000 });
+async function adspyGet(p, token, timeoutMs = 8000, maxLen = 10000) {
+  const r = await fetch(`${ADSPY_BASE}${p}`, { headers: token ? { 'x-app-token': token } : {}, timeout: timeoutMs });
   let text = await r.text();
-  if (text.length > 10000) text = text.slice(0, 10000) + `\n[... truncated; full length ${text.length} ...]`;
+  if (text.length > maxLen) text = text.slice(0, maxLen) + `\n[... truncated; full length ${text.length} ...]`;
   return { status: r.status, text };
 }
 async function execQueryAdspy({ path: p }) {
@@ -594,11 +594,11 @@ async function execRedditFetch({ subreddit, permalink, t }) {
   try {
     if (!adspyToken) await adspyAuth();
     if (!adspyToken) return 'ERROR: ad-spy auth unavailable (relay down?)';
-    let r = await adspyGet(`/api/reddit?${q}`, adspyToken);
-    if (r.status === 401) { await adspyAuth(); r = await adspyGet(`/api/reddit?${q}`, adspyToken); }
-    const d = await r.json().catch(() => null);
-    if (!r.ok || !d) return `ERROR: reddit relay HTTP ${r.status}${d && d.error ? ' ' + String(d.error).slice(0, 120) : ''}`;
-    return JSON.stringify(d).slice(0, 8000);
+    // adspyGet returns {status, text} (not a Response); SC roundtrip needs >8s
+    let res = await adspyGet(`/api/reddit?${q}`, adspyToken, 35000, 20000);
+    if (res.status === 401) { await adspyAuth(); res = await adspyGet(`/api/reddit?${q}`, adspyToken, 35000, 20000); }
+    if (res.status !== 200) return `ERROR: reddit relay HTTP ${res.status} ${String(res.text).slice(0, 120)}`;
+    return res.text;
   } catch (e) { return `ERROR: ${e.message}`; }
 }
 
