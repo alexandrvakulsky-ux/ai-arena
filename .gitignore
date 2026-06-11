@@ -39,3 +39,4 @@ agents/scout-bot/memory.md
 .claude/sessions/cmo-access-setup.md
 # Bot skills with confidential internal patterns (Genesis material) — local-only
 agents/scout-bot/skills/
+agents/scout-bot/sent-hooks.json
