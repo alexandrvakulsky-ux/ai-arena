@@ -10,12 +10,40 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const fetch = require('node-fetch');
 
 const DIR = path.join(__dirname, 'memory');
 const STORE = path.join(DIR, 'vectors.jsonl');
 const MODEL = 'text-embedding-3-small';
 const OPENAI_KEY = process.env.OPENAI_API_KEY;
+
+// ── At-rest encryption (AES-256-GCM per record) ─────────────────────────
+// Meeting transcripts + Slack content must not be readable if the file leaks
+// (git mishap, backup, mirror). Key lives in /workspace/.env (chmod 600) —
+// protects against file-level leaks, NOT a full host compromise that also
+// grabs .env. Lines are "enc1:" + base64(iv[12] | gcmTag[16] | ciphertext);
+// legacy plaintext JSON lines still parse (pre-migration back-compat).
+const ENC_KEY = process.env.BRAIN_ENC_KEY && /^[0-9a-f]{64}$/i.test(process.env.BRAIN_ENC_KEY)
+  ? Buffer.from(process.env.BRAIN_ENC_KEY, 'hex') : null;
+if (!ENC_KEY) console.error('[vectorstore] BRAIN_ENC_KEY missing/invalid — storing PLAINTEXT');
+
+function encLine(obj) {
+  const json = JSON.stringify(obj);
+  if (!ENC_KEY) return json;
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv);
+  const ct = Buffer.concat([c.update(json, 'utf8'), c.final()]);
+  return 'enc1:' + Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64');
+}
+function decLine(line) {
+  if (!line.startsWith('enc1:')) return JSON.parse(line); // legacy plaintext
+  if (!ENC_KEY) throw new Error('encrypted record but BRAIN_ENC_KEY not set');
+  const buf = Buffer.from(line.slice(5), 'base64');
+  const d = crypto.createDecipheriv('aes-256-gcm', ENC_KEY, buf.subarray(0, 12));
+  d.setAuthTag(buf.subarray(12, 28));
+  return JSON.parse(Buffer.concat([d.update(buf.subarray(28)), d.final()]).toString('utf8'));
+}
 
 function enabled() { return !!OPENAI_KEY; }
 
@@ -47,11 +75,11 @@ async function store(role, content, user, tags = {}) {
   const embedding = await embed(content);
   if (!embedding) return false; // no silent fake vectors
   try {
-    fs.mkdirSync(DIR, { recursive: true });
-    fs.appendFileSync(STORE, JSON.stringify({
+    fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
+    fs.appendFileSync(STORE, encLine({
       ts: new Date().toISOString(), user: user || 'unknown', role, content: clean(content.slice(0, 4000)),
       tags, embedding,
-    }) + '\n');
+    }) + '\n', { mode: 0o600 });
     return true;
   } catch (e) { console.error('[vectorstore] store error:', e.message); return false; }
 }
@@ -74,7 +102,7 @@ async function recall(query, limit = 5, opts = {}) {
   const q = await embed(query);
   if (!q) return [];
   let rows = [];
-  try { rows = fs.readFileSync(STORE, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); }
+  try { rows = fs.readFileSync(STORE, 'utf8').split('\n').filter(Boolean).map((l) => decLine(l)); }
   catch (e) { console.error('[vectorstore] read error:', e.message); return []; }
   if (!opts.isOwner) rows = rows.filter((r) => !(r.tags && OWNER_ONLY_SOURCES.has(r.tags.source)));
   return rows

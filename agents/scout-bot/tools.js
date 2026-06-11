@@ -216,13 +216,30 @@ const TOOL_SCHEMAS = [
     name: 'firecrawl_scrape',
     description:
       'Scrape a web page and return its main content as clean markdown (via Firecrawl). ' +
-      'Use to read competitor landing pages, articles, docs, or any URL the user references. Input: a full http(s) URL.',
+      'Use to read competitor landing pages, articles, docs, or any URL the user references. Input: a full http(s) URL. ' +
+      'NOTE: Firecrawl rejects reddit.com — use reddit_fetch for Reddit.',
     input_schema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'Full URL starting with http:// or https://' },
       },
       required: ['url'],
+    },
+  },
+  {
+    name: 'reddit_fetch',
+    description:
+      'Fetch Reddit content (via the ad-spy relay — Reddit blocks this host directly and Firecrawl rejects reddit.com). ' +
+      'Two modes: (1) pass subreddit (e.g. "Scams") to get the top posts of the last week — titles, scores, selftext previews, permalinks; ' +
+      '(2) pass permalink (from mode 1, e.g. "/r/Scams/comments/abc123/title/") to read that post\'s top comments. ' +
+      'Use for victim stories (r/Scams, r/IdentityTheft, r/privacy), trend research, or any "what does Reddit say about X".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        subreddit: { type: 'string', description: 'Subreddit name without r/ prefix, e.g. "Scams"' },
+        permalink: { type: 'string', description: 'Post permalink path starting with /r/ — returns full post + top comments' },
+        t: { type: 'string', description: 'Top-posts time window: day|week|month (default week)' },
+      },
     },
   },
 ];
@@ -565,6 +582,26 @@ async function execFirecrawlScrape({ url }) {
   } catch (e) { return `ERROR: ${e.message}`; }
 }
 
+// ── Reddit via the ad-spy relay ─────────────────────────────────────────
+// Reddit 403s datacenter IPs and Firecrawl rejects reddit.com, so ad-spy
+// (open egress + ScrapeCreators key) proxies it at GET /api/reddit — same
+// relay pattern as Slack/Fireflies ingest. Reuses the ad-spy auth helpers.
+async function execRedditFetch({ subreddit, permalink, t }) {
+  const q = permalink
+    ? `permalink=${encodeURIComponent(permalink)}`
+    : `subreddit=${encodeURIComponent(subreddit || '')}&t=${encodeURIComponent(/^(day|week|month)$/.test(t || '') ? t : 'week')}`;
+  if (!permalink && !(subreddit && /^[\w]+$/.test(subreddit))) return 'ERROR: pass subreddit (letters/digits/underscore) or permalink';
+  try {
+    if (!adspyToken) await adspyAuth();
+    if (!adspyToken) return 'ERROR: ad-spy auth unavailable (relay down?)';
+    let r = await adspyGet(`/api/reddit?${q}`, adspyToken);
+    if (r.status === 401) { await adspyAuth(); r = await adspyGet(`/api/reddit?${q}`, adspyToken); }
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) return `ERROR: reddit relay HTTP ${r.status}${d && d.error ? ' ' + String(d.error).slice(0, 120) : ''}`;
+    return JSON.stringify(d).slice(0, 8000);
+  } catch (e) { return `ERROR: ${e.message}`; }
+}
+
 // ── Dispatcher ──────────────────────────────────────────────────────────
 async function executeTool(name, input, opts = {}) {
   try {
@@ -573,6 +610,7 @@ async function executeTool(name, input, opts = {}) {
       case 'query_aiarena': return await execQueryAiarena(input || {});
       case 'vector_search': return await execVectorSearch(input || {}, opts);
       case 'firecrawl_scrape': return await execFirecrawlScrape(input || {});
+      case 'reddit_fetch': return await execRedditFetch(input || {});
       case 'read_file': return execReadFile(input || {});
       case 'list_directory': return execListDirectory(input || {});
       case 'tail_log': return execTailLog(input || {});

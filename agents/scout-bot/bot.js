@@ -999,8 +999,8 @@ const REDDIT_STORIES_SPEC = `
 ═══ TASK: WEEKLY REDDIT STORY MINE FOR LERA ═══
 Mine real data-leak / scam victim stories from Reddit and turn them into ad material. Steps:
 
-STEP 1 — web_search for this week's top discussed posts in r/Scams, r/IdentityTheft, r/privacy (queries like "reddit r/Scams" + current scam patterns; restrict to the last 7-14 days where possible). Pick the 5-8 most emotionally charged STORIES (not advice threads).
-STEP 2 — firecrawl_scrape 2-3 of the strongest threads via their old.reddit.com URL to get the full story + top comments. Capture the victims' OWN phrasing — exact words carry the emotion.
+STEP 1 — reddit_fetch(subreddit) for each of: Scams, IdentityTheft, privacy (top of the week). Pick the 5-8 most emotionally charged self-post STORIES (not advice threads) by title + selftext preview + comment count.
+STEP 2 — reddit_fetch(permalink) on the 3-4 strongest stories to read the full post + top comments. Capture the victims' OWN phrasing — exact words carry the emotion. (Do NOT use firecrawl for reddit — it rejects the domain.)
 STEP 3 — Distill 4-5 recurring STORY ARCHETYPES (who + what happened + emotional core + 1 short real-language quote fragment each).
 STEP 4 — Write EXACTLY 8 hooks/POVs in Lera's locked style, each derived from an archetype, tagged [from: r/Scams — <archetype>], each ending with a one-line audience-skew hypothesis. Broad 25-65+. Meta-safe wording per the skill.
 
