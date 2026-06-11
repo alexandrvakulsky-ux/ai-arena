@@ -37,3 +37,5 @@ agents/scout-bot/memory.md
 .claude/sessions/slack-secondbrain-approval.md
 .claude/sessions/security-and-code-review.md
 .claude/sessions/cmo-access-setup.md
+# Bot skills with confidential internal patterns (Genesis material) — local-only
+agents/scout-bot/skills/

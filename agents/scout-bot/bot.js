@@ -795,7 +795,10 @@ async function handleMessage(msg) {
   content = stripSurrogates(content);
 
   await tg('sendChatAction', { chat_id, action: 'typing' });
-  const reply = await generateReply(chat_id, content, null, pdfBlock, label);
+  // Creative questions get Lera's locked style + Genesis patterns appended to
+  // the system prompt; unrelated chats skip it (token hygiene).
+  const sysOv = CREATIVE_RE.test(content) ? buildSystemPrompt() + creativeSkillBlock() : null;
+  const reply = await generateReply(chat_id, content, sysOv, pdfBlock, label);
   if (reply && reply.trim()) {
     appendJournal(`bot: ${reply.slice(0, 200)}${reply.length > 200 ? '…' : ''}`);
     await sendMessage(chat_id, reply);
@@ -877,6 +880,18 @@ const PROMPTS = {
 // 25-65+ audience w/ hypothesis notes) + act_mq8a7jg3_zjii (every hook must
 // derive from an observed trend and cite it inline).
 const SENT_HOOKS_FILE = path.join(BOT_DIR, 'sent-hooks.json');
+// Creative-hooks skill (act_mq96hyix_6636): Lera's locked style + Genesis patterns
+// in one file instead of fragmented memory lines. Appended to the system prompt
+// ONLY for ads/creative-related messages (and always for the creative-trends
+// cadence) to keep tokens out of unrelated conversations.
+const CREATIVE_SKILL_FILE = path.join(BOT_DIR, 'skills', 'creative-hooks.md');
+function creativeSkillBlock() {
+  try { return '\n\n═══ SKILL: CREATIVE HOOKS ═══\n' + fs.readFileSync(CREATIVE_SKILL_FILE, 'utf8'); }
+  catch { return ''; }
+}
+// EN + UA/RU roots — Lera writes in Ukrainian/Russian. No \b around Cyrillic
+// (word boundaries don't work with non-ASCII).
+const CREATIVE_RE = /\b(ads?|creatives?|hooks?|campaign|trend|angle)\b|кре(о|атив)|хук|реклам|тренд|оголошен|заголовк|креатив/i;
 const CREATIVE_TRENDS_SPEC = `
 
 ═══ TASK: DAILY CREATIVE-TRENDS BRIEF FOR LERA ═══
@@ -886,12 +901,14 @@ STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new') (and '/api/br
 
 STEP 2 — Pop/viral trend scan: web_search for current viral trends from the last 7 days (meme formats, TikTok/IG formats, big pop-culture or news moments). Keep ONLY trends that can be credibly bridged to the data-leak topic.
 
+MANDATORY BRIDGING RULE (Lera, act_mq8dzzm5_pf2h): naming a trend without bridged hook examples is NOT allowed. For EVERY pop-culture trend cited in the snapshot, include 2-3 ready-to-shoot hook/headline examples bridging it to the data-leak/email-leak/account-leak angle, in Lera's locked dark-POV confession style, each with its one-line audience-skew hypothesis. Competitor-derived patterns follow the same rule: pattern → 2-3 bridged hooks. The 10 daily hooks may be drawn from these bridged examples.
+
 STEP 3 — Write EXACTLY 10 hooks/POVs in Lera's locked style (dark/provocative honest-leak confession + POV formats — her creative direction is in your memory). Broad 25-65+ audience; do NOT split into demographic segments. EVERY hook must: (a) cite its trend source inline — "[from: Incogni 'price of your data' series]" or "[from: <meme/format name>]"; (b) end with a one-line hypothesis about expected audience skew — "hypothesis: meme-native, skews 25-40" / "hypothesis: family-protection angle, strongest 50+". Mix ≈5-6 competitor-derived / ≈4-5 pop-trend-derived (flex if one source is dry today).
 
 STEP 4 — Do NOT repeat or closely paraphrase any previously sent hook (list below), and avoid re-flagging the same competitor pattern more than 2 days running.
 
 OUTPUT — one compact Telegram message, no walls of text:
-• Trend snapshot: 3-5 bullets (what competitors push + what's viral)
+• Trend snapshot: 3-5 bullets — each bullet = trend/pattern + its 2-3 bridged hook examples (never a bare trend name)
 • Then the 10 numbered hooks (1. … 10.), each with its [from: …] tag + hypothesis line.`;
 
 function loadSentHooks() {
@@ -921,7 +938,7 @@ async function fireCreativeTrends(cadence) {
     const reply = await generateReply(
       chat_id,
       'Generate my daily creative-trends brief.',
-      buildSystemPrompt() + spec,
+      buildSystemPrompt() + creativeSkillBlock() + spec,
       null,
       'lera'
     );
