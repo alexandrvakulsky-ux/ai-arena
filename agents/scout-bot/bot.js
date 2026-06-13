@@ -59,8 +59,8 @@ const JOURNAL_FILE = path.join(BOT_DIR, 'journal.md');
 fs.mkdirSync(CHATS_DIR, { recursive: true });
 
 const TG = `https://api.telegram.org/bot${TOKEN}`;
-const MODEL = 'claude-fable-5'; // chat answers — most capable tier (Alex: complex questions need complex answers)
-const CADENCE_MODEL = 'claude-sonnet-4-6'; // proactive openers — cheaper than Fable, user won't notice
+const MODEL = 'claude-opus-4-8'; // chat answers — Fable 5 dropped 2026-06-11 (geo-restricted outside US)
+const CADENCE_MODEL = 'claude-sonnet-4-6'; // proactive openers — cheaper than Opus, user won't notice
 const MAX_HISTORY_TURNS = 20;
 const HISTORY_KEEP = 40;
 
@@ -517,9 +517,8 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
         },
         body: JSON.stringify({
           model: MODEL,
-          // Fable 5 always thinks (adaptive, can't be disabled) and thinking tokens
-          // count against max_tokens — 3000 left ~500 for text and truncated the
-          // creative-trends brief mid-hook. 8000 gives thinking + a full long reply.
+          // Creative briefs run long (10 hooks + snapshot); 3000 truncated them
+          // mid-hook. 8000 gives a full reply with headroom.
           max_tokens: 8000,
           system: sysBlocks,
           messages,
@@ -583,7 +582,7 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
         },
         body: JSON.stringify({
           model: MODEL,
-          max_tokens: 4000, // headroom for Fable 5's always-on thinking (see above)
+          max_tokens: 4000, // long-output headroom (see above)
           system: sysBlocks,
           messages,
           tools: toolsArr,
