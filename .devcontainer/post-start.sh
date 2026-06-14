@@ -20,6 +20,21 @@ _start_sshd
 done) &
 disown
 
+# Persist root-cwd agent memory across rebuilds. It lives at
+# /root/.claude/projects/-root/memory/ but /root is overlay (wiped on rebuild);
+# the named volume /home/node/.claude survives. Symlink the former to the latter
+# so memory writes land on the volume and come back after a rebuild. (post-create
+# only re-seeds CLAUDE.md/settings/skills/agents — NOT projects/memory.)
+mkdir -p /home/node/.claude/projects/-root/memory /root/.claude/projects/-root 2>/dev/null || true
+if [ ! -L /root/.claude/projects/-root/memory ]; then
+    # If a real (overlay) memory dir exists with content, fold it into the volume first.
+    if [ -d /root/.claude/projects/-root/memory ]; then
+        cp -an /root/.claude/projects/-root/memory/. /home/node/.claude/projects/-root/memory/ 2>/dev/null || true
+        rm -rf /root/.claude/projects/-root/memory
+    fi
+    ln -s /home/node/.claude/projects/-root/memory /root/.claude/projects/-root/memory 2>/dev/null || true
+fi
+
 # Keep global config in sync from repo (source of truth)
 if [ -f /workspace/.devcontainer/global-claude/CLAUDE.md ]; then
     cp /workspace/.devcontainer/global-claude/CLAUDE.md "$HOME/.claude/CLAUDE.md" 2>/dev/null || true
