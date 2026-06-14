@@ -363,10 +363,15 @@ function loadContextSnapshot() {
 }
 
 // ── Claude API ───────────────────────────────────────────────────────────
-function buildSystemPrompt() {
+// STABLE half of the system prompt: frozen instructions + curated memory. This
+// is the prompt-cache prefix — it changes only when memory.md is appended (a few
+// times a day), so it caches and is reused across messages. The volatile context
+// (journal + live snapshot, which change every message) lives in a SEPARATE
+// uncached block via buildVolatileContext() — keeping them out of here is what
+// makes the cache actually hit. (Before: journal/snapshot baked in here meant the
+// cached prefix differed every call → cache written ×1.25 every time, never read.)
+function buildSystemStable() {
   const memory = loadMemory();
-  const journal = loadJournalTail(60);
-  const snapshot = loadContextSnapshot();
   return `You are Alex's AI Chief of Staff on Telegram. You're his daily-ish proactive advisor for three projects:
 - **Futureproof** (active priority) — consumer cybersecurity SaaS in development
 - **ad-spy** — FB Ad Library intelligence tool, runs at http://135.181.153.92:3001
@@ -399,12 +404,6 @@ When you learn new context about Alex's projects, include a line prefixed "MEMOR
 
 Memory (long-term curated context):
 ${memory}
-
-Journal (recent chronological log of what Alex told you):
-${journal}
-
-Live system snapshot:
-${snapshot}
 
 You have web_search — use it when you need current info, but don't over-search. If you already know the answer, just say it.
 
@@ -443,6 +442,24 @@ Output style for scout reports:
 - Each find should cite the source ID and handle, e.g. "[src_seed_swyx | @swyx] retweeted a thread about new MCP server X..."
 - At the end of the scout, briefly note: "Source updates this cycle: added @NewSource (mentioned by @swyx), bumped @ProductiveAccount to q=4 after 3 hits." That keeps the database growth visible.`;
 }
+
+// VOLATILE half: journal (grows every message) + live system snapshot. Goes in
+// an UNCACHED system block AFTER the cached prefix, so its constant churn never
+// invalidates the cache.
+function buildVolatileContext() {
+  return `
+
+═══ LIVE CONTEXT (changes frequently — not cached) ═══
+Journal (recent chronological log of what Alex told you):
+${loadJournalTail(60)}
+
+Live system snapshot:
+${loadContextSnapshot()}`;
+}
+
+// Full prompt (stable + volatile) — used by the cadence path where it's a single
+// one-shot call so the split doesn't help.
+function buildSystemPrompt() { return buildSystemStable() + buildVolatileContext(); }
 
 function processMemoryUpdates(replyText) {
   const lines = replyText.split('\n');
@@ -497,8 +514,17 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
   // system prompt + tools schema aren't re-billed at full price across tool-loop iterations
   // (or across back-to-back messages within the cache TTL). Same model, same output, ~90% off
   // the cached input tokens.
-  const sysText = (systemOverride || buildSystemPrompt()) + mediationBlock(userLabel);
-  const sysBlocks = [{ type: 'text', text: sysText, cache_control: { type: 'ephemeral' } }];
+  // Prompt-cache layout: stable prefix (instructions + memory + per-user mediation)
+  // gets the cache breakpoint (1h TTL — the bot's traffic is bursty with gaps);
+  // volatile context (journal + snapshot) trails in an uncached block so its
+  // every-message churn doesn't invalidate the cached prefix. systemOverride
+  // (creative briefs) is one-shot, so it's a single cached block.
+  const sysBlocks = systemOverride
+    ? [{ type: 'text', text: systemOverride + mediationBlock(userLabel), cache_control: { type: 'ephemeral', ttl: '1h' } }]
+    : [
+        { type: 'text', text: buildSystemStable() + mediationBlock(userLabel), cache_control: { type: 'ephemeral', ttl: '1h' } },
+        { type: 'text', text: buildVolatileContext() },
+      ];
   const toolsArr = [
     { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
     ...BOT_TOOLS,
@@ -527,6 +553,10 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
         timeout: 120000,
       });
       data = await r.json();
+      if (data && data.usage) {
+        const u = data.usage;
+        console.log(`[cache] read=${u.cache_read_input_tokens || 0} write=${u.cache_creation_input_tokens || 0} uncached_in=${u.input_tokens || 0} out=${u.output_tokens || 0}`);
+      }
     } catch (err) {
       console.error('[anthropic] fetch error:', err.message);
       return 'hit a network issue talking to Claude — try again?';
