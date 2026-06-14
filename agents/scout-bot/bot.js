@@ -922,6 +922,9 @@ const CADENCES = [
   { day: 2, hour: 7, key: 'reddit-stories', handler: 'reddit-stories' },
   // Mondays 10:00 UTC — handler self-gates to the FIRST Monday of the month
   { day: 1, hour: 10, key: 'angle-whitespace', handler: 'angle-whitespace' },
+  // Daily 08:00 UTC — proactive prompt-cache/cost drift check (deterministic,
+  // only messages Alex if the hit ratio is low). Catches it before the bill does.
+  { days: [0, 1, 2, 3, 4, 5, 6], hour: 8, key: 'cost-pulse', handler: 'cost-pulse' },
 ];
 
 const PROMPTS = {
@@ -1061,10 +1064,34 @@ async function fireAngleWhitespace() {
   return fireLeraBrief('angle-whitespace', ANGLE_WHITESPACE_SPEC, 'Generate my monthly angle white-space analysis.');
 }
 
+// Proactive cost monitor — catches prompt-cache drift before Anthropic's email
+// does. Deterministic (no model call): parses recent [cache] usage logs; if the
+// cache hit ratio is low despite real volume, pings Alex with the numbers.
+function fireCostPulse() {
+  let lines;
+  try { lines = fs.readFileSync('/workspace/scout-bot.log', 'utf8').split('\n'); }
+  catch { return; }
+  const re = /\[cache\] read=(\d+) write=(\d+) uncached_in=(\d+) out=(\d+)/;
+  let read = 0, write = 0, unc = 0, n = 0;
+  for (const l of lines.slice(-3000)) { // recent window
+    const m = l.match(re);
+    if (m) { read += +m[1]; write += +m[2]; unc += +m[3]; n++; }
+  }
+  const cacheableIn = read + write + unc;
+  if (n < 10 || cacheableIn < 50000) { console.log(`[cost-pulse] n=${n} cacheableIn=${cacheableIn} — too little data, skip`); return; }
+  const ratio = read / cacheableIn;
+  console.log(`[cost-pulse] calls=${n} hit_ratio=${(ratio * 100).toFixed(0)}% read=${read} write=${write} uncached=${unc}`);
+  if (ratio < 0.30) {
+    const owner = Object.entries(loadUsers()).find(([, l]) => l === 'alex');
+    if (owner) sendMessage(owner[0], `⚠️ Cost pulse: prompt-cache hit ratio dropped to ${(ratio * 100).toFixed(0)}% over the last ${n} calls (read ${(read / 1000).toFixed(0)}k / write ${(write / 1000).toFixed(0)}k / uncached ${(unc / 1000).toFixed(0)}k tokens). Something may be invalidating the cache prefix — worth a look before the spend climbs.`).catch(() => {});
+  }
+}
+
 async function fireCadence(cadence) {
   if (cadence.handler === 'creative-trends') return fireCreativeTrends();
   if (cadence.handler === 'reddit-stories') return fireRedditStories();
   if (cadence.handler === 'angle-whitespace') return fireAngleWhitespace();
+  if (cadence.handler === 'cost-pulse') return fireCostPulse();
   if (isSnoozed()) {
     console.log(`[cadence] ${cadence.key} skipped — bot is snoozed`);
     return;
