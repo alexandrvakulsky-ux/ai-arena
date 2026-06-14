@@ -40,3 +40,8 @@ agents/scout-bot/memory.md
 # Bot skills with confidential internal patterns (Genesis material) — local-only
 agents/scout-bot/skills/
 agents/scout-bot/sent-hooks.json
+
+# Own Meta campaign data (perf numbers, hooks) — sensitive, local-only; ingest script stays tracked
+data/meta-campaigns/*.json
+data/meta-campaigns/*.md
+data/meta-campaigns/_raw/

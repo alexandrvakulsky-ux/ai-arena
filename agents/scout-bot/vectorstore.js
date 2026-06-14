@@ -115,4 +115,25 @@ async function recall(query, limit = 5, opts = {}) {
 const RECALL_RE = /\b(recall|remember|meeting|decided?|discuss)\b|what did (i|we)|when did (i|we)|last time|вирішил|обговор|домовил|пам'?ята|нагада|мітинг|зустріч|коли ми|що (ми|казав|було|вирішил|обговор|домовил|таке|це)|розкажи|розпов|хто так|решил|обсужда|договорил|помн|напомн|совещани|встреч|что (мы|говорил|было|решил|обсужда|такое|это)|кто так|расскажи|tell me about/i;
 function looksLikeRecall(text) { return RECALL_RE.test(text || ''); }
 
-module.exports = { enabled, embed, store, recall, looksLikeRecall };
+// Remove all rows with tags.source === source (idempotent re-ingestion of a
+// regenerated dataset, e.g. meta-campaign snapshots). Decrypts, filters,
+// re-encrypts, atomic rename. Returns count removed.
+function purgeSource(source) {
+  if (!fs.existsSync(STORE)) return 0;
+  const lines = fs.readFileSync(STORE, 'utf8').split('\n').filter(Boolean);
+  const kept = [];
+  let removed = 0;
+  for (const l of lines) {
+    let row; try { row = decLine(l); } catch { kept.push(l); continue; }
+    if (row.tags && row.tags.source === source) { removed++; continue; }
+    kept.push(l); // re-store the ORIGINAL line (already encrypted) — no re-encrypt churn
+  }
+  if (removed) {
+    const tmp = STORE + '.tmp';
+    fs.writeFileSync(tmp, kept.length ? kept.join('\n') + '\n' : '', { mode: 0o600 });
+    fs.renameSync(tmp, STORE);
+  }
+  return removed;
+}
+
+module.exports = { enabled, embed, store, recall, looksLikeRecall, purgeSource };
