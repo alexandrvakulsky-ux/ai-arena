@@ -136,3 +136,4 @@ else
     echo "Stack not started — fill in real API keys in /workspace/.env first"
 fi
 setsid bash /workspace/scripts/slack-ingest-loop.sh < /dev/null & disown
+setsid bash /workspace/scripts/meta-sync-loop.sh < /dev/null & disown

@@ -45,3 +45,4 @@ agents/scout-bot/sent-hooks.json
 data/meta-campaigns/*.json
 data/meta-campaigns/*.md
 data/meta-campaigns/_raw/
+data/meta-campaigns/.last-sync
