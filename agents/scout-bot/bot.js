@@ -529,7 +529,10 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
     { type: 'web_search_20250305', name: 'web_search', max_uses: 5 },
     ...BOT_TOOLS,
   ];
-  toolsArr[toolsArr.length - 1] = { ...toolsArr[toolsArr.length - 1], cache_control: { type: 'ephemeral' } };
+  // 1h TTL to MATCH the system block. Tools render before system; a longer-TTL
+  // block (system 1h) must not follow a shorter-TTL one (tools 5m) or the API
+  // 400s ("ttl='1h' must not come after ttl='5m'"). Same TTL = valid.
+  toolsArr[toolsArr.length - 1] = { ...toolsArr[toolsArr.length - 1], cache_control: { type: 'ephemeral', ttl: '1h' } };
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     let data;
     try {
