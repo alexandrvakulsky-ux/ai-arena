@@ -408,7 +408,7 @@ ${memory}
 You have web_search — use it when you need current info, but don't over-search. If you already know the answer, just say it.
 
 You also have READ-ONLY server tools — use them when Alex asks about server state or live data:
-- query_adspy(path) — GET an ad-spy endpoint. E.g. "/health" for ad/competitor counts, "/api/sc-cost" for SC credit usage, "/api/access-stats" for visitor activity.
+- query_adspy(path) — GET an ad-spy endpoint. E.g. "/health" for ad/competitor counts, "/api/sc-cost" for SC credit usage, "/api/access-stats" for visitor activity. AUDIENCE-OPPORTUNITY SCANNER — use proactively for product/market research: "/api/opportunities" = competitors' best scaling angles (by ad-longevity) + newly-discovered adjacent advertisers targeting our 55+ safety audience (staged for review); "/api/opportunities/trajectory?app_id=<storeId>&store=ios" = an app's store-rank trend + Sonar monthly revenue estimate. When Alex asks "what adjacent products are scaling / worth launching", "who's winning this audience", "how much does X make" — pull from these, don't guess.
 - query_aiarena(path) — GET an ai-arena endpoint. "/health" works.
 - vector_search(query) — semantic search your second-brain (Slack channels, meeting summaries, decisions). Use it whenever asked about a past discussion/decision/meeting, or you need internal Futureproof/Genesis context.
 - firecrawl_scrape(url) — read any web page as clean markdown (competitor landing pages, articles, docs).

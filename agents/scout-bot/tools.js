@@ -47,6 +47,11 @@ const TOOL_SCHEMAS = [
       'Auth-required (the bot may NOT have an ad-spy key yet → these can return 401): ' +
       '/api/competitors, /api/ads, /api/ads/new, /api/brief/today, /api/sc-cost, /api/access-stats, ' +
       '/api/completeness, /api/clusters, /api/discover. ' +
+      'AUDIENCE-OPPORTUNITY SCANNER (use these for "what adjacent products are scaling / worth launching", ' +
+      '"who is winning the 55+ safety audience", revenue questions): ' +
+      '/api/opportunities (ranked competitor scaling-angles + newly-discovered advertiser candidates staged for review), ' +
+      '/api/opportunities/discover (re-run discovery), ' +
+      '/api/opportunities/trajectory?app_id=<storeId>&store=ios|android (an apps store-rank trend + Sonar monthly revenue estimate). ' +
       'If a call returns 401/403, the bot lacks ad-spy auth — tell the user that and STOP; do NOT try other paths. ' +
       'Path must start with /. Returns up to 10KB.',
     input_schema: {
