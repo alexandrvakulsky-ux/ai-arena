@@ -168,7 +168,26 @@ async function tg(method, params) {
   });
   return r.json();
 }
+// Strip raw model scaffolding that must never reach the user. The scout cadence
+// prompts tell the model to "call list_sources(...)", but the cadence API call
+// passes NO tools, so the model emits fake <tool_call>/<tool_response> text into
+// the reply. Belt-and-suspenders: also catch function_calls/invoke/tool_use forms.
+function stripToolScaffolding(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '')
+    .replace(/<tool_response>[\s\S]*?<\/tool_response>/gi, '')
+    .replace(/<tool_use>[\s\S]*?<\/tool_use>/gi, '')
+    .replace(/<function_calls>[\s\S]*?<\/function_calls>/gi, '')
+    .replace(/<invoke[\s\S]*?<\/invoke>/gi, '')
+    .replace(/<\/?antml:[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 async function sendMessage(chat_id, text) {
+  text = stripToolScaffolding(text);
+  if (!text) { console.log('[send] suppressed empty message (was only scaffolding)'); return; }
   const chunks = [];
   let remaining = text;
   while (remaining.length > 4000) {
@@ -933,9 +952,9 @@ const CADENCES = [
 const PROMPTS = {
   'daily-checkin': `Generate a SHORT daily check-in question to Alex. Reference yesterday's journal entries if relevant. ONE focused question, max 2 sentences before it. Examples of good openers:\n- "Yesterday you said X — did it ship?"\n- "Two days back you flagged the funnel issue. Where's that now?"\n- "What's the top thing today?"\n\nMake it specific to context if you have it, generic if not. Output ONLY the message text — no preamble, no markdown, ready to send to Telegram as-is.`,
 
-  'mcp-scout': `It's Monday. Generate the opening message for the MCP scout cadence. First, call list_sources(topic='mcp') to see what you're already monitoring — surface 1-2 high-quality sources you'll check ("checking @swyx, modelcontextprotocol/servers, r/ClaudeAI today"). Then ask Alex ONE planning question (what category he's hungry for, or any new account he wants you to add). For THIS message just write the opener — no actual web_search yet. Output ONLY the message text.`,
+  'mcp-scout': `It's Monday. Write the opening message for the MCP scout cadence. Mention 1-2 high-quality sources you regularly check (e.g. "checking @swyx, modelcontextprotocol/servers, r/ClaudeAI today"). Then ask Alex ONE planning question (what category he's hungry for, or any new account he wants you to add). Do NOT call any tools — this is just the opener text. Output ONLY the message text, ready to send to Telegram.`,
 
-  'futureproof-scout': `It's Thursday. Generate the opener for the Futureproof intel cadence. First call list_sources(topic='futureproof') and list_sources(topic='marketing') to acknowledge what you're tracking. Then ask Alex 2-3 prep one-liners: biggest blocker, competitor to look at, what tested last week. Output ONLY the opener, ready to send.`,
+  'futureproof-scout': `It's Thursday. Write the opener for the Futureproof intel cadence. Briefly acknowledge what you track (Futureproof + marketing sources). Then ask Alex 2-3 prep one-liners: biggest blocker, competitor to look at, what tested last week. Do NOT call any tools — this is just the opener text. Output ONLY the opener, ready to send.`,
 
   'sunday-wrap': `It's Sunday 5pm. Generate a soft weekly wrap-up message. Reference the journal entries from this past week if any. Ask: "what shipped this week?", "what's on your mind for next?", and one specific reference back to something he mentioned earlier in the week if possible. Output ONLY the message text, conversational, max 4 short sentences.`,
 };
