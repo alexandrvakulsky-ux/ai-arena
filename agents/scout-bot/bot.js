@@ -984,7 +984,7 @@ const CREATIVE_TRENDS_SPEC = `
 ═══ TASK: DAILY CREATIVE-TRENDS BRIEF FOR LERA ═══
 Generate Lera's daily creative brief for Futureproof (data-leak / email-leak / accounts-leak topic). Use your tools — do not skip steps:
 
-STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new') (and '/api/brief/today' if it returns data). Look at fresh ads across ALL tracked competitors — Digital Security (Cloaked, Guardio, Aura, Norton, Incogni...) AND Genesis-vertical brands (incl. Deepstash). Identify 2-4 recurring patterns: hook formats (POV/confession/listicle/UGC), themes, visual mechanics, emotional angles. Note which competitor and roughly how many ads share each pattern.
+STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80') (and '/api/brief/today' if it returns data). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0); stats.per_competitor/per_group give counts. Look at fresh ads across ALL tracked competitors — Digital Security (Cloaked, Guardio, Aura, Norton, Incogni...) AND Genesis-vertical brands (incl. Deepstash). Identify 2-4 recurring patterns: hook formats (POV/confession/listicle/UGC), themes, visual mechanics, emotional angles. Note which competitor and roughly how many ads share each pattern.
 
 STEP 2 — Pop/viral trend scan: web_search for current viral trends from the last 7 days (meme formats, TikTok/IG formats, big pop-culture or news moments). Keep ONLY trends that can be credibly bridged to the data-leak topic.
 
@@ -1074,7 +1074,7 @@ const ANGLE_WHITESPACE_SPEC = `
 ═══ TASK: MONTHLY ANGLE WHITE-SPACE MATRIX FOR LERA ═══
 Map the competitive angle landscape and find UNTESTED territory. Steps:
 
-STEP 1 — query_adspy('/api/ads?limit=200&sort=impressions') and query_adspy('/api/ads/new?limit=100'). Each ad carries angle, angle_status, angle_velocity, _competitor, _group fields plus body text.
+STEP 1 — query_adspy('/api/ads?nofetch=1&compact=1&limit=80&sort=impressions') and query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80'). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0); stats.per_competitor/per_group give per-brand counts for the matrix.
 STEP 2 — Build a matrix: EMOTION (fear / shame / curiosity / guilt / humor / hope / anger / nostalgia) × MECHANIC (POV confession / tag-a-friend / moral-debate bait / voyeur visual / listicle / UGC testimonial / fake-alert villain / data-shock stat). For each cell note which competitors run it and how heavily (ad counts, days running).
 STEP 3 — Identify: (a) 3-4 SATURATED cells (don't fight there without a twist), (b) 4-5 EMPTY or near-empty cells = white space.
 STEP 4 — For each white-space cell: one-line why it's plausibly untested (hard to pass review? hard to produce? genuinely bad?) + 1 example hook in Lera's locked style bridged to the data-leak topic, with audience-skew hypothesis.
