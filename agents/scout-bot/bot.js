@@ -230,7 +230,56 @@ function saveHistory(chat_id, history) {
 // via Telegram's getFile API and POST it to OpenAI's Whisper endpoint.
 // Returns the transcribed text or null on any failure (caller falls back
 // to "I can't read voice yet" reply).
-async function transcribeVoice(fileId) {
+// Persist the most-recent voice note per chat so a failed transcription can be
+// recovered later via /retranscribe — Whisper is the flaky part; the audio is
+// cheap to keep. One file per chat, overwritten each time.
+const VOICE_DIR = path.join(__dirname, '.voice');
+try { fs.mkdirSync(VOICE_DIR, { recursive: true }); } catch {}
+const voicePath = (chatId) => path.join(VOICE_DIR, `${chatId}.ogg`);
+
+// Retry a transient-failing async op with exponential backoff. Retries only on
+// network blips / 5xx / rate-limit; fails fast on permanent errors (marked
+// .permanent, e.g. 400/401/413 auth/bad-request/too-large). backoff 1s/3s/8s.
+const TRANSIENT_RE = /timeout|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|502|503|504|429/i;
+async function withRetry(fn, { retries = 3, delays = [1000, 3000, 8000], label = 'op' } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try { return await fn(); }
+    catch (err) {
+      lastErr = err;
+      if (err && err.permanent) throw err;
+      if (!TRANSIENT_RE.test(String(err && err.message))) throw err; // permanent → fail fast
+      if (attempt === retries) break;
+      const wait = delays[Math.min(attempt, delays.length - 1)];
+      console.log(`[voice] ${label} retry ${attempt + 1}/${retries} after ${wait}ms (${redact(err.message)})`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  throw lastErr;
+}
+
+// POST an audio buffer to Whisper → text. Throws on failure, marking
+// permanent (non-retryable) for 400/401/413 so withRetry won't spin on them.
+async function whisperFromBuffer(audioBuf) {
+  const form = new FormData();
+  form.append('file', audioBuf, { filename: 'voice.ogg', contentType: 'audio/ogg' });
+  form.append('model', 'whisper-1');
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, ...form.getHeaders() },
+    body: form,
+    timeout: 60000,
+  });
+  if (!res.ok) {
+    const err = new Error(`Whisper HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if ([400, 401, 413].includes(res.status)) err.permanent = true;
+    throw err;
+  }
+  const data = await res.json();
+  return data.text || null;
+}
+
+async function transcribeVoice(fileId, chatId) {
   if (!OPENAI_KEY) {
     console.error('[voice] OPENAI_API_KEY missing — cannot transcribe');
     return null;
@@ -242,30 +291,17 @@ async function transcribeVoice(fileId) {
       return null;
     }
     const audioUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileRes.result.file_path}`;
-    const audioRes = await fetch(audioUrl, { timeout: 30000 });
-    if (!audioRes.ok) {
-      console.error('[voice] file download failed:', audioRes.status);
-      return null;
-    }
-    const audioBuf = await audioRes.buffer();
+    const audioBuf = await withRetry(async () => {
+      const audioRes = await fetch(audioUrl, { timeout: 30000 });
+      if (!audioRes.ok) throw new Error(`file download HTTP ${audioRes.status}`);
+      return await audioRes.buffer();
+    }, { label: 'download' });
+    // Persist BEFORE transcribing so a Whisper failure is still recoverable.
+    if (chatId != null) { try { fs.writeFileSync(voicePath(chatId), audioBuf); } catch {} }
 
-    const form = new FormData();
-    form.append('file', audioBuf, { filename: 'voice.ogg', contentType: 'audio/ogg' });
-    form.append('model', 'whisper-1');
-
-    const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, ...form.getHeaders() },
-      body: form,
-      timeout: 60000,
-    });
-    if (!whisperRes.ok) {
-      console.error('[voice] Whisper error:', whisperRes.status, (await whisperRes.text()).slice(0, 200));
-      return null;
-    }
-    const data = await whisperRes.json();
-    console.log(`[voice] transcribed ${audioBuf.length}b → ${(data.text || '').length} chars`);
-    return data.text || null;
+    const text = await withRetry(() => whisperFromBuffer(audioBuf), { label: 'whisper' });
+    console.log(`[voice] transcribed ${audioBuf.length}b → ${(text || '').length} chars`);
+    return text;
   } catch (err) {
     console.error('[voice] transcribeVoice error:', redact(err.message));
     return null;
@@ -686,6 +722,7 @@ async function handleSlashCommand(chat_id, text) {
       `/quiet — drop daily check-ins, keep Mon/Thu/Sun only\n` +
       `/normal — restore Mon-Fri + weekly cadence\n` +
       `/memory — show current long-term memory file\n` +
+      `/retranscribe — re-run Whisper on your last voice note (if it failed)\n` +
       `\nNatural language works too — try "snooze for a week" or "less".`
     );
     return true;
@@ -725,6 +762,26 @@ async function handleSlashCommand(chat_id, text) {
     await sendMessage(chat_id, `Snoozed proactive pings until ${until} UTC. You can still message me anytime.`);
     return true;
   }
+  if (text === '/retranscribe') {
+    const p = voicePath(chat_id);
+    if (!fs.existsSync(p)) {
+      await sendMessage(chat_id, `No saved voice note to re-transcribe. Send a voice message first — I keep the last one per chat.`);
+      return true;
+    }
+    await tg('sendChatAction', { chat_id, action: 'typing' });
+    await sendMessage(chat_id, '🎤 re-transcribing your last voice note…');
+    try {
+      const textOut = await withRetry(() => whisperFromBuffer(fs.readFileSync(p)), { label: 'whisper' });
+      if (textOut && textOut.trim()) {
+        await sendMessage(chat_id, `🎤 Recovered:\n\n${textOut.trim()}\n\n(Resend or reply to act on it.)`);
+      } else {
+        await sendMessage(chat_id, `Re-transcription came back empty — the audio may be silent or corrupt.`);
+      }
+    } catch (e) {
+      await sendMessage(chat_id, `Re-transcription still failing: ${redact(e.message)}. Try again in a moment.`);
+    }
+    return true;
+  }
   return false;
 }
 
@@ -740,7 +797,7 @@ async function handleMessage(msg) {
     const fileId = (msg.voice || msg.audio).file_id;
     await tg('sendChatAction', { chat_id, action: 'typing' });
     await sendMessage(chat_id, '🎤 transcribing...');
-    const transcript = await transcribeVoice(fileId);
+    const transcript = await transcribeVoice(fileId, chat_id);
     if (transcript && transcript.trim()) {
       msg.text = `[voice] ${transcript.trim()}`;
     } else {
@@ -901,11 +958,20 @@ function enqueue(chat_id, fn) {
   return next;
 }
 let offset = 0;
+let _pollFails = 0;            // consecutive transient failures
+let _lastPollOk = Date.now();  // last healthy getUpdates
+const POLL_WEDGE_MS = 2 * 60 * 1000;
+// Exponential backoff with jitter, capped at 30s, scaled by consecutive fails.
+async function backoffPoll() {
+  const base = Math.min(30000, 500 * Math.pow(2, Math.min(_pollFails, 6)));
+  await new Promise(r => setTimeout(r, base + Math.floor(Math.random() * 500)));
+}
 async function poll() {
   try {
     const r = await fetch(`${TG}/getUpdates?offset=${offset}&timeout=30`, { timeout: 35000 });
     const data = await r.json();
     if (data.ok && Array.isArray(data.result)) {
+      _pollFails = 0; _lastPollOk = Date.now();
       for (const update of data.result) {
         offset = update.update_id + 1;
         if (update.message) {
@@ -914,12 +980,23 @@ async function poll() {
         }
       }
     } else if (data.error_code) {
+      // Real API/config errors (409 conflict, 401 bad token) — always surface.
       console.error('[poll] tg error:', JSON.stringify(data).slice(0, 200));
-      await new Promise(r => setTimeout(r, 10000));
+      _pollFails++;
+      await backoffPoll();
+      return setImmediate(poll);
     }
   } catch (err) {
-    if (err.code !== 'ETIMEDOUT') console.error('[poll]', redact(err.message));
-    await new Promise(r => setTimeout(r, 5000));
+    _pollFails++;
+    // Transient long-poll drops (ECONNRESET/502/timeout) are normal for
+    // getUpdates. Stay quiet except for the first blip or a genuine wedge
+    // (no successful poll in >2min = something actually stuck).
+    const wedged = Date.now() - _lastPollOk > POLL_WEDGE_MS;
+    if (_pollFails === 1 || wedged) {
+      console.error(`[poll] ${wedged ? 'WEDGED >2min — ' : 'transient (quieted) — '}${redact(err.message)} (fail #${_pollFails})`);
+    }
+    await backoffPoll();
+    return setImmediate(poll);
   }
   setImmediate(poll);
 }
