@@ -561,6 +561,24 @@ async function generateReply(chat_id, userMessage, systemOverride = null, attach
     last.content = [attachment, { type: 'text', text: typeof last.content === 'string' ? last.content : userMessage }];
   }
 
+  // Prompt-cache the conversation-history prefix: without this, the whole
+  // (up-to-20-turn) history is re-billed as uncached input every turn. Put the
+  // breakpoint on the last message's last content block; tool-loop messages
+  // append AFTER it as an uncached suffix (normal growing-suffix pattern), and
+  // the next turn reads this prefix from cache. Same 1h TTL as tools+system so
+  // the TTL-ordering rule holds. Purely additive — does not touch memory or
+  // message content, only tags the last block for caching.
+  if (messages.length) {
+    const last = messages[messages.length - 1];
+    if (typeof last.content === 'string' && last.content.trim()) {
+      last.content = [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral', ttl: '1h' } }];
+    } else if (Array.isArray(last.content) && last.content.length) {
+      const i = last.content.length - 1;
+      last.content[i] = { ...last.content[i], cache_control: { type: 'ephemeral', ttl: '1h' } };
+    }
+    // else: empty string content — leave untouched (an empty cached text block would 400)
+  }
+
   // Agentic loop: call API, execute any tool_use blocks, feed results
   // back, repeat until Claude stops calling tools (final answer).
   let finalText = '';
