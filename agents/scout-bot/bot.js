@@ -947,7 +947,7 @@ async function handleMessage(msg) {
   const SWIPE_SPEC = imageBlock ? `
 
 ═══ IMAGE / SWIPE-FILE PROTOCOL ═══
-If the attached image is an ad creative (or social post used as an ad): start your reply with the literal tag "SWIPE:" then break it down — (1) hook mechanic: format, emotional trigger, social mechanic (tag-bait / debate-bait / voyeur); (2) why it works or doesn't vs our locked style; (3) 1-2 adaptations bridged to the data-leak topic in Lera's locked POV style. Keep it tight. If the image is NOT an ad, skip the tag and just answer normally.` : '';
+If the attached image is an ad creative (or social post used as an ad): start your reply with the literal tag "SWIPE:" then break it down — (1) hook mechanic: format, emotional trigger, social mechanic (tag-bait / debate-bait / voyeur); (2) why it works or doesn't vs our locked style; (3) 1-2 adaptations bridged to the OSINT / reverse-lookup / scam-verification topic in Lera's locked POV style. Keep it tight. If the image is NOT an ad, skip the tag and just answer normally.` : '';
   const sysOv = (CREATIVE_RE.test(content) || imageBlock) ? buildSystemPrompt() + creativeSkillBlock() + SWIPE_SPEC : null;
   const reply = await generateReply(chat_id, content, sysOv, pdfBlock || imageBlock, label);
   if (reply && reply.trim()) {
@@ -1077,15 +1077,15 @@ const CREATIVE_RE = /\b(ads?|creatives?|hooks?|campaign|trend|angle)\b|кре(о
 const CREATIVE_TRENDS_SPEC = `
 
 ═══ TASK: DAILY CREATIVE-TRENDS BRIEF FOR LERA ═══
-Generate Lera's daily creative brief for Futureproof (data-leak / email-leak / accounts-leak topic). Use your tools — do not skip steps:
+Generate Lera's daily creative brief for Futureproof's OSINT product line — reverse phone/email lookup, people-search, scam-caller ID, romance-scam & catfish verification. The promise: "find out who's really behind that number, name, or profile." (Pivot 2026 from the data-leak angle; keep Lera's locked style, new subject.) Use your tools — do not skip steps:
 
-STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80') (and '/api/brief/today' if it returns data). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0); stats.per_competitor/per_group give counts. Look at fresh ads across ALL tracked competitors — Digital Security (Cloaked, Guardio, Aura, Norton, Incogni...) AND Genesis-vertical brands (incl. Deepstash). Identify 2-4 recurring patterns: hook formats (POV/confession/listicle/UGC), themes, visual mechanics, emotional angles. Note which competitor and roughly how many ads share each pattern.
+STEP 1 — Competitor trend scan: call query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80&group=OSINT') (and '/api/opportunities' for the disciplined-advertiser ranking). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0). Focus on the OSINT group — Social Catfish, BeenVerified, TruthFinder, Spokeo, iFindCheaters ("Is he/she cheating?" personas), Catch A Cheater, and the reverse-lookup advertisers. Identify 2-4 recurring patterns: hook formats (POV/reveal/reverse-lookup demo/UGC), themes, visual mechanics (voyeur result-card, "type any number"), emotional angles. Note which competitor and roughly how many ads share each pattern.
 
-STEP 2 — Pop/viral trend scan: web_search for current viral trends from the last 7 days (meme formats, TikTok/IG formats, big pop-culture or news moments). Keep ONLY trends that can be credibly bridged to the data-leak topic.
+STEP 2 — Pop/viral trend scan: web_search for current viral trends from the last 7 days (meme formats, TikTok/IG formats, big pop-culture or news moments). Keep ONLY trends that can be credibly bridged to the OSINT / reverse-lookup / scam-verification angle.
 
-MANDATORY BRIDGING RULE (Lera, act_mq8dzzm5_pf2h): naming a trend without bridged hook examples is NOT allowed. For EVERY pop-culture trend cited in the snapshot, include 2-3 ready-to-shoot hook/headline examples bridging it to the data-leak/email-leak/account-leak angle, in Lera's locked dark-POV confession style, each with its one-line audience-skew hypothesis. Competitor-derived patterns follow the same rule: pattern → 2-3 bridged hooks. The 10 daily hooks may be drawn from these bridged examples.
+MANDATORY BRIDGING RULE (Lera, act_mq8dzzm5_pf2h): naming a trend without bridged hook examples is NOT allowed. For EVERY pop-culture trend cited in the snapshot, include 2-3 ready-to-shoot hook/headline examples bridging it to the OSINT / reverse-lookup / scam-catch angle, in Lera's locked dark-POV reveal/confession style, each with its one-line audience-skew hypothesis. Competitor-derived patterns follow the same rule: pattern → 2-3 bridged hooks. The 10 daily hooks may be drawn from these bridged examples.
 
-STEP 3 — Write EXACTLY 10 hooks/POVs in Lera's locked style (dark/provocative honest-leak confession + POV formats — her creative direction is in your memory). Broad 25-65+ audience; do NOT split into demographic segments. EVERY hook must: (a) cite its trend source inline — "[from: Incogni 'price of your data' series]" or "[from: <meme/format name>]"; (b) end with a one-line hypothesis about expected audience skew — "hypothesis: meme-native, skews 25-40" / "hypothesis: family-protection angle, strongest 50+". Mix ≈5-6 competitor-derived / ≈4-5 pop-trend-derived (flex if one source is dry today).
+STEP 3 — Write EXACTLY 10 hooks/POVs in Lera's locked style (dark/provocative POV + reveal formats — her creative direction is in your memory), applied to the OSINT subject: the reveal of who's really behind a number/name/profile, the scam caught before it landed, the person who wasn't who they claimed. Broad 25-65+ audience; do NOT split into demographic segments. EVERY hook must: (a) cite its trend source inline — "[from: Social Catfish reverse-image reveal]" or "[from: <meme/format name>]"; (b) end with a one-line hypothesis about expected audience skew — "hypothesis: romance-scam angle, strongest 50+" / "hypothesis: meme-native, skews 25-40". Mix ≈5-6 competitor-derived / ≈4-5 pop-trend-derived (flex if one source is dry today).
 
 STEP 4 — Do NOT repeat or closely paraphrase any previously sent hook (list below), and avoid re-flagging the same competitor pattern more than 2 days running.
 
@@ -1146,12 +1146,12 @@ async function fireCreativeTrends() {
 const REDDIT_STORIES_SPEC = `
 
 ═══ TASK: WEEKLY REDDIT STORY MINE FOR LERA ═══
-Mine real data-leak / scam victim stories from Reddit and turn them into ad material. Steps:
+Mine real OSINT-angle victim stories from Reddit — romance scams, catfish, unknown-caller/scam-call, "I looked him up and…" — and turn them into ad material. Steps:
 
-STEP 1 — reddit_fetch(subreddit) for each of: Scams, IdentityTheft, privacy (top of the week). Pick the 5-8 most emotionally charged self-post STORIES (not advice threads) by title + selftext preview + comment count.
+STEP 1 — reddit_fetch(subreddit) for each of: Scams, catfish, phonescams, relationship_advice (top of the week). Pick the 5-8 most emotionally charged self-post STORIES (not advice threads) by title + selftext preview + comment count — favor ones where a lookup/verification would have changed the outcome.
 STEP 2 — reddit_fetch(permalink) on the 3-4 strongest stories to read the full post + top comments. Capture the victims' OWN phrasing — exact words carry the emotion. (Do NOT use firecrawl for reddit — it rejects the domain.)
 STEP 3 — Distill 4-5 recurring STORY ARCHETYPES (who + what happened + emotional core + 1 short real-language quote fragment each).
-STEP 4 — Write EXACTLY 8 hooks/POVs in Lera's locked style, each derived from an archetype, tagged [from: r/Scams — <archetype>], each ending with a one-line audience-skew hypothesis. Broad 25-65+. Meta-safe wording per the skill.
+STEP 4 — Write EXACTLY 8 hooks/POVs in Lera's locked style, each derived from an archetype, tagged [from: r/<subreddit> — <archetype>], each ending with a one-line audience-skew hypothesis. Broad 25-65+. Meta-safe wording per the skill.
 
 OUTPUT — one compact Telegram message:
 • 4-5 archetype bullets (story core + real quote fragment)
@@ -1169,10 +1169,10 @@ const ANGLE_WHITESPACE_SPEC = `
 ═══ TASK: MONTHLY ANGLE WHITE-SPACE MATRIX FOR LERA ═══
 Map the competitive angle landscape and find UNTESTED territory. Steps:
 
-STEP 1 — query_adspy('/api/ads?nofetch=1&compact=1&limit=80&sort=impressions') and query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80'). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0); stats.per_competitor/per_group give per-brand counts for the matrix.
+STEP 1 — query_adspy('/api/ads?nofetch=1&compact=1&limit=80&sort=impressions&group=OSINT') and query_adspy('/api/ads/new?nofetch=1&compact=1&limit=80&group=OSINT'). Each ad is compact: c=competitor, g=group, h=hook text, f=format, d=days_running, a=active(1/0); stats.per_competitor/per_group give per-brand counts for the matrix. Focus the matrix on the OSINT competitor group.
 STEP 2 — Build a matrix: EMOTION (fear / shame / curiosity / guilt / humor / hope / anger / nostalgia) × MECHANIC (POV confession / tag-a-friend / moral-debate bait / voyeur visual / listicle / UGC testimonial / fake-alert villain / data-shock stat). For each cell note which competitors run it and how heavily (ad counts, days running).
 STEP 3 — Identify: (a) 3-4 SATURATED cells (don't fight there without a twist), (b) 4-5 EMPTY or near-empty cells = white space.
-STEP 4 — For each white-space cell: one-line why it's plausibly untested (hard to pass review? hard to produce? genuinely bad?) + 1 example hook in Lera's locked style bridged to the data-leak topic, with audience-skew hypothesis.
+STEP 4 — For each white-space cell: one-line why it's plausibly untested (hard to pass review? hard to produce? genuinely bad?) + 1 example hook in Lera's locked style bridged to the OSINT / reverse-lookup / scam-verification topic, with audience-skew hypothesis.
 
 OUTPUT — one compact Telegram message: the matrix summary (saturated vs empty), then numbered white-space opportunities (1. … 5.) each with its example hook.`;
 
