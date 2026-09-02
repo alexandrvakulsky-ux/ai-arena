@@ -52,6 +52,10 @@ const TOOL_SCHEMAS = [
       '/api/opportunities (ranked competitor scaling-angles + newly-discovered advertiser candidates staged for review), ' +
       '/api/opportunities/discover (re-run discovery), ' +
       '/api/opportunities/trajectory?app_id=<storeId>&store=ios|android (an apps store-rank trend + Sonar monthly revenue estimate). ' +
+      'FIREFLIES MEETING TRANSCRIPTS (verbatim call quotes by speaker + timecode, beyond the summaries in vector memory): ' +
+      '/api/fireflies/meetings?limit=&from=&to= (list recent meetings: id, title, date, participants), ' +
+      '/api/fireflies/search?q=<keyword>&scan=<N> (BEST for "what exactly did X say about Y" — returns only matching sentences with speaker_name + start_time; scan defaults to 10 recent meetings), ' +
+      '/api/fireflies/transcript?id=<meetingId> (FULL transcript — can be hundreds of sentences and WILL be truncated at 10KB here, so prefer /search for quotes). ' +
       'If a call returns 401/403, the bot lacks ad-spy auth — tell the user that and STOP; do NOT try other paths. ' +
       'Path must start with /. Returns up to 10KB.',
     input_schema: {
